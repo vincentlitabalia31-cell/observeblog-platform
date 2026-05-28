@@ -34,14 +34,12 @@ export async function POST(request: Request) {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    const emailResult = await sendSubscriptionConfirmation(email).catch((error) => {
+    void sendSubscriptionConfirmation(email).catch((error) => {
       logServerError('Subscription confirmation email failed:', error);
-      return { sent: false, reason: 'SEND_FAILED' };
     });
 
     return NextResponse.json({
-      message: 'Subscription saved.',
-      confirmationEmail: emailResult
+      message: 'Subscription saved.'
     });
   } catch (error) {
     if (error instanceof Error && error.message === 'RATE_LIMITED') {

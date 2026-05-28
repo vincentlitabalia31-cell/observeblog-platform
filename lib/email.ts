@@ -1,29 +1,47 @@
 import nodemailer from 'nodemailer';
 import { logServerError } from './logging';
 
+function getEmailEnv(name: string) {
+  return process.env[name]?.trim();
+}
+
+function logEmailError(message: string, error: unknown) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error(message, error instanceof Error ? error.message : error);
+    return;
+  }
+
+  logServerError(message, error);
+}
+
 export function isSmtpConfigured() {
-  return Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS && (process.env.EMAIL_HOST || process.env.EMAIL_SERVICE));
+  return Boolean(getEmailEnv('EMAIL_USER') && getEmailEnv('EMAIL_PASS'));
 }
 
 function createTransporter() {
-  if (process.env.EMAIL_HOST) {
-    const port = Number(process.env.EMAIL_PORT || 587);
+  const emailUser = getEmailEnv('EMAIL_USER');
+  const emailPass = getEmailEnv('EMAIL_PASS');
+  const emailHost = getEmailEnv('EMAIL_HOST');
+  const emailService = getEmailEnv('EMAIL_SERVICE') || 'gmail';
+
+  if (emailHost) {
+    const port = Number(getEmailEnv('EMAIL_PORT') || 587);
     return nodemailer.createTransport({
-      host: process.env.EMAIL_HOST,
+      host: emailHost,
       port,
       secure: port === 465,
       auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
+        user: emailUser,
+        pass: emailPass
       }
     });
   }
 
   return nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE || 'gmail',
+    service: emailService,
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
+      user: emailUser,
+      pass: emailPass
     }
   });
 }
@@ -39,15 +57,20 @@ function escapeHtml(value: string) {
 
 async function sendMail(options: { to: string; subject: string; text: string; html: string }) {
   if (!isSmtpConfigured()) {
-    logServerError('Email skipped: SMTP environment variables are not configured.', new Error('SMTP_NOT_CONFIGURED'));
+    logEmailError('Email skipped: SMTP environment variables are not configured.', new Error('SMTP_NOT_CONFIGURED'));
     return { sent: false, reason: 'SMTP_NOT_CONFIGURED' };
   }
 
-  const transporter = createTransporter();
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-    ...options
-  });
+  try {
+    const transporter = createTransporter();
+    await transporter.sendMail({
+      from: getEmailEnv('EMAIL_FROM') || getEmailEnv('EMAIL_USER'),
+      ...options
+    });
+  } catch (error) {
+    logEmailError('Email send failed:', error);
+    throw error;
+  }
 
   return { sent: true };
 }
