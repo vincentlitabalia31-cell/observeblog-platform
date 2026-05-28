@@ -14,7 +14,7 @@ A collaborative publication platform for students exploring campus life, culture
 ## Setup
 
 1. Copy `.env.example` to `.env.local`.
-2. Fill in `MONGODB_URI`, `NEXTAUTH_SECRET`, and `NEXTAUTH_URL`.
+2. Fill in `MONGODB_URI`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, and SMTP variables if using subscription confirmations.
 3. Install dependencies:
 
 ```bash
@@ -34,6 +34,8 @@ npm run dev
 - Minimal editorial UI
 - Login and registration for contributors
 - JWT sessions with credentials auth and bcrypt password hashing
+- Strict single-admin rule: only `vincentlitabalia31@gmail.com` receives the effective admin role
+- Contributor admin-request workflow stored in MongoDB
 - Contributor dashboard with drafts, pending posts, published posts, rejected posts, and saved essays
 - Markdown editorial publishing with draft, submit-for-review, publish, edit, and delete flows
 - Admin moderation dashboard for posts, users, comments, featured essays, and content statistics
@@ -43,25 +45,36 @@ npm run dev
 
 ## Admin setup
 
-New accounts are created as contributors. To create an admin, update the user document in MongoDB:
+The only effective admin email is hard-set in code as `vincentlitabalia31@gmail.com`. All other accounts authenticate as contributors, even if an admin request is approved.
 
-```js
-db.users.updateOne({ email: "you@example.com" }, { $set: { role: "admin" } })
+Admin requests are stored in MongoDB:
+
+```txt
+admin_requests/{id}
+userId
+email
+status: pending | approved | rejected
+createdAt
 ```
 
-Admin routes are protected at `/admin` and `/api/admin/*`.
+Admin routes are protected at `/admin` and `/api/admin/*` by the NextAuth session role.
 
 ## Newsletter setup
 
 Subscriptions work with only MongoDB configured. To send email, add:
 
 ```bash
+EMAIL_HOST=smtp.example.com
+EMAIL_PORT=587
+EMAIL_USER=your_smtp_user
+EMAIL_PASS=your_smtp_password
+EMAIL_FROM="Observing India <newsletter@yourdomain.com>"
 RESEND_API_KEY=your_resend_key
 NEWSLETTER_FROM="Observing India <newsletter@yourdomain.com>"
 NEXT_PUBLIC_SITE_URL=https://your-domain.com
 ```
 
-Admins can preview or send digests through `/api/admin/newsletter`.
+Subscription confirmation emails are sent immediately with Nodemailer. Admin digest sending can still use Resend through `/api/admin/newsletter`.
 
 ## Deployment
 

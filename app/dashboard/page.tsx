@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth/next';
 import Navigation from '../../components/Navigation';
 import PostEditor from '../../components/PostEditor';
+import AdminRequestButton from '../../components/AdminRequestButton';
 import { authOptions } from '../../lib/auth';
 import { getBookmarkedPostsForUser, getPostsForAuthor } from '../../lib/posts';
 
@@ -49,6 +50,7 @@ export default async function DashboardPage() {
               ))}
             </div>
           </div>
+          {session.user.role !== 'admin' ? <AdminRequestButton /> : null}
           <PostEditor />
 
           <section className="rounded-lg border border-soft bg-white p-8 shadow-panel">

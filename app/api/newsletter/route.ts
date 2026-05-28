@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { connectToDatabase } from '../../../lib/mongodb';
 import { assertRateLimit, isValidEmail, normalizeEmail, sanitizePlainText } from '../../../lib/security';
 import { createUnsubscribeToken } from '../../../lib/newsletter';
+import { sendSubscriptionConfirmation } from '../../../lib/email';
 import NewsletterSubscriber from '../../../models/NewsletterSubscriber';
 
 export async function POST(request: Request) {
@@ -19,6 +20,7 @@ export async function POST(request: Request) {
     }
 
     await connectToDatabase();
+    const unsubscribeToken = createUnsubscribeToken(`${email}:${crypto.randomUUID()}`);
     await NewsletterSubscriber.findOneAndUpdate(
       { email },
       {
@@ -26,16 +28,22 @@ export async function POST(request: Request) {
         name,
         frequency,
         active: true,
-        unsubscribeToken: createUnsubscribeToken(`${email}:${crypto.randomUUID()}`)
+        unsubscribeToken
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    return NextResponse.json({ message: 'Subscription saved.' });
+    const emailResult = await sendSubscriptionConfirmation(email);
+
+    return NextResponse.json({
+      message: 'Subscription saved.',
+      confirmationEmail: emailResult
+    });
   } catch (error) {
     if (error instanceof Error && error.message === 'RATE_LIMITED') {
       return NextResponse.json({ error: 'Too many attempts. Please try again soon.' }, { status: 429 });
     }
+    console.error('Newsletter subscription failed:', error);
     return NextResponse.json({ error: 'Unable to save subscription.' }, { status: 500 });
   }
 }

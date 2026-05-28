@@ -3,6 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { connectToDatabase } from './mongodb';
 import User from '../models/User';
 import bcrypt from 'bcryptjs';
+import { getRoleForUser, persistEffectiveRole } from './roles';
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
@@ -32,12 +33,14 @@ export const authOptions: NextAuthOptions = {
 
         const isValid = await bcrypt.compare(credentials.password, user.password);
         if (!isValid) return null;
+        const role = await getRoleForUser(user._id.toString(), user.email);
+        await persistEffectiveRole(user._id.toString(), user.email);
 
         return {
           id: user._id.toString(),
           name: user.name,
           email: user.email,
-          role: user.role === 'admin' ? 'admin' : 'contributor',
+          role,
           image: user.image
         };
       }
@@ -47,7 +50,10 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.role = user.role;
+        token.role = user.role === 'admin' ? 'admin' : 'contributor';
+      }
+      if (token.id && token.email) {
+        token.role = await getRoleForUser(String(token.id), String(token.email));
       }
       return token;
     },

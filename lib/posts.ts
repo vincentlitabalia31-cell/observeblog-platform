@@ -5,6 +5,7 @@ import User from '../models/User';
 import Comment from '../models/Comment';
 import PostInteraction from '../models/PostInteraction';
 import NewsletterSubscriber from '../models/NewsletterSubscriber';
+import { getRoleForUser } from './roles';
 
 export interface PublicPost {
   id: string;
@@ -302,9 +303,16 @@ export async function getAdminData(): Promise<AdminData> {
     NewsletterSubscriber.countDocuments({ active: true })
   ]);
 
+  const profiles = await Promise.all(
+    users.map(async (user) => {
+      const profile = serializeProfile(user);
+      return { ...profile, role: await getRoleForUser(profile.id, profile.email) };
+    })
+  );
+
   return {
     posts: posts.map(serializePost),
-    users: users.map(serializeProfile),
+    users: profiles,
     comments: comments.map(serializeComment),
     stats: {
       totalPosts,

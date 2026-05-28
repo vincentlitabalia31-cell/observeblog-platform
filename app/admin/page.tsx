@@ -3,15 +3,17 @@ import { getServerSession } from 'next-auth/next';
 import Navigation from '../../components/Navigation';
 import { PostModerationControls, UserRoleControl } from '../../components/AdminControls';
 import AdminCommentControls from '../../components/AdminCommentControls';
+import AdminRequestControls from '../../components/AdminRequestControls';
 import { authOptions } from '../../lib/auth';
 import { getAdminData } from '../../lib/posts';
+import { listAdminRequests } from '../../lib/roles';
 
 export default async function AdminPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect('/login?callbackUrl=/admin');
   if (session.user.role !== 'admin') redirect('/dashboard');
 
-  const { posts, users, comments, stats } = await getAdminData();
+  const [{ posts, users, comments, stats }, adminRequests] = await Promise.all([getAdminData(), listAdminRequests()]);
 
   return (
     <main className="min-h-screen bg-paper text-ink">
@@ -59,6 +61,31 @@ export default async function AdminPage() {
           </section>
 
           <div className="grid gap-8">
+            <section className="rounded-lg border border-soft bg-white p-6 shadow-panel">
+              <h2 className="text-2xl font-semibold text-ink">Admin requests</h2>
+              <div className="mt-6 grid gap-4">
+                {adminRequests.map((request) => (
+                  <article key={request.id} className="rounded-lg border border-soft bg-slate-50 p-5">
+                    <p className="text-xs uppercase tracking-[0.18em] text-soft">{request.status}</p>
+                    <p className="mt-2 font-semibold text-ink">{request.email}</p>
+                    <p className="mt-1 text-sm text-soft">
+                      {new Date(request.createdAt).toLocaleDateString('en-IN', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </p>
+                    {request.status === 'pending' ? (
+                      <div className="mt-4">
+                        <AdminRequestControls id={request.id} />
+                      </div>
+                    ) : null}
+                  </article>
+                ))}
+                {!adminRequests.length ? <p className="text-sm text-soft">No admin requests yet.</p> : null}
+              </div>
+            </section>
+
             <section className="rounded-lg border border-soft bg-white p-6 shadow-panel">
               <h2 className="text-2xl font-semibold text-ink">Users</h2>
               <div className="mt-6 grid gap-4">

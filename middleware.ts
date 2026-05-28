@@ -3,18 +3,17 @@ import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
 const protectedPaths = ['/dashboard', '/admin'];
-const adminOnlyPaths = ['/admin', '/api/admin'];
 
 export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
   const isProtected = protectedPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
-  const isAdminOnly = adminOnlyPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+  const isProtectedApi = pathname.startsWith('/api/admin') || pathname.startsWith('/api/admin-requests');
 
   const isWriteApi =
     pathname.startsWith('/api/posts') && (request.method === 'POST' || request.method === 'PATCH' || request.method === 'DELETE');
 
-  if (!isProtected && !isAdminOnly && !isWriteApi) {
+  if (!isProtected && !isProtectedApi && !isWriteApi) {
     return NextResponse.next();
   }
 
@@ -27,17 +26,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (isAdminOnly && token.role !== 'admin') {
-    const dashboardUrl = request.nextUrl.clone();
-    dashboardUrl.pathname = '/dashboard';
-    dashboardUrl.search = '';
-    return NextResponse.redirect(dashboardUrl);
-  }
-
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/admin/:path*', '/api/admin/:path*', '/api/posts/:path*']
+  matcher: ['/dashboard/:path*', '/admin/:path*', '/api/admin/:path*', '/api/admin-requests/:path*', '/api/posts/:path*']
 };
-

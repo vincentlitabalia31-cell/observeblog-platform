@@ -62,7 +62,9 @@ export function UserRoleControl({ id, role }: { id: string; role: 'contributor' 
         className="rounded-lg border border-soft bg-white px-3 py-2 text-xs text-ink"
       >
         <option value="contributor">Contributor</option>
-        <option value="admin">Admin</option>
+        <option value="admin" disabled>
+          Admin via request approval
+        </option>
       </select>
       {status ? <span className="text-xs text-soft">{status}</span> : null}
     </div>

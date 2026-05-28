@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '../../../../lib/mongodb';
 import User from '../../../../models/User';
 import bcrypt from 'bcryptjs';
+import { isConfiguredAdminEmail, persistEffectiveRole } from '../../../../lib/roles';
 
 export async function POST(request: Request) {
   try {
@@ -28,8 +29,9 @@ export async function POST(request: Request) {
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password: hashedPassword,
-      role: 'contributor'
+      role: isConfiguredAdminEmail(email) ? 'admin' : 'contributor'
     });
+    await persistEffectiveRole(user._id.toString(), user.email);
 
     return NextResponse.json({
       message: 'Registration successful.',
