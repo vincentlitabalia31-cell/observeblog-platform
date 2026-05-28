@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../lib/auth';
 import { connectToDatabase } from '../../../lib/mongodb';
+import { sanitizePlainText } from '../../../lib/security';
+import { logServerError } from '../../../lib/logging';
 import Post from '../../../models/Post';
 
 function slugify(value: string) {
@@ -12,11 +14,16 @@ function slugify(value: string) {
 }
 
 export async function GET() {
-  await connectToDatabase();
-  const posts = await Post.find({ $or: [{ status: 'published', published: true }, { status: { $exists: false }, published: true }] })
-    .sort({ publishedAt: -1 })
-    .lean();
-  return NextResponse.json(posts);
+  try {
+    await connectToDatabase();
+    const posts = await Post.find({ $or: [{ status: 'published', published: true }, { status: { $exists: false }, published: true }] })
+      .sort({ publishedAt: -1 })
+      .lean();
+    return NextResponse.json(posts);
+  } catch (error) {
+    logServerError('Public posts fetch failed:', error);
+    return NextResponse.json([], { status: 200 });
+  }
 }
 
 export async function POST(request: Request) {
@@ -28,13 +35,24 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { title, excerpt, content, category, tags, publishAction, coverImage } = body;
+    const titleText = typeof title === 'string' ? title.trim() : '';
+    const excerptText = typeof excerpt === 'string' ? excerpt.trim() : '';
+    const contentText = typeof content === 'string' ? content.trim() : '';
 
-    if (!title?.trim() || !excerpt?.trim() || !content?.trim()) {
+    if (publishAction && !['draft', 'publish'].includes(publishAction)) {
+      return NextResponse.json({ error: 'Invalid publish action.' }, { status: 400 });
+    }
+
+    if (!titleText || !excerptText || !contentText) {
       return NextResponse.json({ error: 'Title, excerpt, and content are required.' }, { status: 400 });
     }
 
     await connectToDatabase();
-    const slug = slugify(body.slug || title);
+    const slug = slugify(typeof body.slug === 'string' && body.slug.trim() ? body.slug : titleText);
+    if (!slug) {
+      return NextResponse.json({ error: 'A valid slug is required.' }, { status: 400 });
+    }
+
     const existing = await Post.findOne({ slug });
     if (existing) {
       return NextResponse.json({ error: 'A post with that slug already exists.' }, { status: 409 });
@@ -45,13 +63,13 @@ export async function POST(request: Request) {
     const authorId = session.user.id;
     const now = new Date();
     const post = await Post.create({
-      title: title.trim(),
-      excerpt: excerpt.trim(),
-      content: content.trim(),
+      title: sanitizePlainText(titleText, 180),
+      excerpt: sanitizePlainText(excerptText, 800),
+      content: contentText,
       slug,
-      coverImage: coverImage?.trim() || undefined,
-      category: category?.trim() || 'Campus Life',
-      tags: Array.isArray(tags) ? tags.map((tag) => String(tag).trim()).filter(Boolean).slice(0, 8) : [],
+      coverImage: typeof coverImage === 'string' ? coverImage.trim().slice(0, 1000) || undefined : undefined,
+      category: typeof category === 'string' && category.trim() ? sanitizePlainText(category, 80) : 'Campus Life',
+      tags: Array.isArray(tags) ? tags.map((tag) => sanitizePlainText(String(tag), 40)).filter(Boolean).slice(0, 8) : [],
       author: session.user.name || 'Guest author',
       authorId,
       status,
@@ -62,6 +80,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ message: status === 'draft' ? 'Draft saved successfully.' : 'Post submitted successfully.', post });
   } catch (error) {
+    logServerError('Post create failed:', error);
     return NextResponse.json({ error: 'Unable to save post.' }, { status: 500 });
   }
 }

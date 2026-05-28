@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../lib/auth';
 import { createAdminRequest, listAdminRequests } from '../../../lib/roles';
+import { logServerError } from '../../../lib/logging';
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -9,8 +10,13 @@ export async function GET() {
     return NextResponse.json({ error: 'Admin access required.' }, { status: 403 });
   }
 
-  const requests = await listAdminRequests();
-  return NextResponse.json({ requests });
+  try {
+    const requests = await listAdminRequests();
+    return NextResponse.json({ requests });
+  } catch (error) {
+    logServerError('Admin requests fetch failed:', error);
+    return NextResponse.json({ requests: [] });
+  }
 }
 
 export async function POST() {
@@ -27,7 +33,7 @@ export async function POST() {
     const id = await createAdminRequest(session.user.id, session.user.email);
     return NextResponse.json({ message: 'Admin request submitted.', id });
   } catch (error) {
-    console.error('Admin request creation failed:', error);
+    logServerError('Admin request creation failed:', error);
     return NextResponse.json({ error: 'Unable to submit admin request.' }, { status: 500 });
   }
 }

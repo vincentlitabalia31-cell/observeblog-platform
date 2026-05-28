@@ -5,6 +5,8 @@ export interface IUser {
   email: string;
   password: string;
   role: 'contributor' | 'admin';
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
   bio?: string;
   affiliation?: string;
   image?: string;
@@ -18,6 +20,8 @@ const UserSchema = new Schema<IUser>(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true },
     role: { type: String, enum: ['contributor', 'admin'], default: 'contributor' },
+    passwordResetToken: { type: String },
+    passwordResetExpires: { type: Date },
     bio: { type: String, default: '' },
     affiliation: { type: String, default: '' },
     image: { type: String }

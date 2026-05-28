@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { logServerError } from './logging';
 
 export function isSmtpConfigured() {
   return Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS && (process.env.EMAIL_HOST || process.env.EMAIL_SERVICE));
@@ -38,7 +39,7 @@ function escapeHtml(value: string) {
 
 async function sendMail(options: { to: string; subject: string; text: string; html: string }) {
   if (!isSmtpConfigured()) {
-    console.warn('Email skipped: SMTP environment variables are not configured.');
+    logServerError('Email skipped: SMTP environment variables are not configured.', new Error('SMTP_NOT_CONFIGURED'));
     return { sent: false, reason: 'SMTP_NOT_CONFIGURED' };
   }
 
@@ -120,6 +121,37 @@ export async function sendPostStatusEmail({
               : ''
           }
           ${safeHref ? `<p style="margin-top: 22px"><a href="${safeHref}" style="color: #1f1f1f; font-weight: 700">Open article</a></p>` : ''}
+        </div>
+      </div>`
+  });
+}
+
+export async function sendPasswordResetEmail({ to, href }: { to: string; href: string }) {
+  const safeHref = escapeHtml(href);
+
+  return sendMail({
+    to,
+    subject: 'Reset your Observing India password',
+    text: [
+      'We received a request to reset your Observing India password.',
+      'Use the link below within 60 minutes:',
+      href,
+      'If you did not request this, you can ignore this email.'
+    ].join('\n\n'),
+    html: `
+      <div style="font-family: Arial, sans-serif; background: #f7f5ef; padding: 32px; color: #1f1f1f">
+        <div style="max-width: 620px; margin: 0 auto; background: #fffaf1; border: 1px solid #e6dfd3; padding: 28px">
+          <p style="font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: #6b6b6b">Password reset</p>
+          <h1 style="font-family: Georgia, serif; font-size: 28px; margin: 8px 0 12px">Observing India</h1>
+          <p style="line-height: 1.7; color: #3a3a3a">
+            We received a request to reset your password. This link expires in 60 minutes.
+          </p>
+          <p style="margin-top: 22px">
+            <a href="${safeHref}" style="color: #1f1f1f; font-weight: 700">Reset password</a>
+          </p>
+          <p style="line-height: 1.7; color: #6b6b6b">
+            If you did not request this, you can ignore this email.
+          </p>
         </div>
       </div>`
   });

@@ -3,6 +3,7 @@ import { connectToDatabase } from '../../../../lib/mongodb';
 import User from '../../../../models/User';
 import bcrypt from 'bcryptjs';
 import { isConfiguredAdminEmail, persistEffectiveRole } from '../../../../lib/roles';
+import { logServerError } from '../../../../lib/logging';
 
 export async function POST(request: Request) {
   try {
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
       user: { id: user._id.toString(), name: user.name, email: user.email, role: user.role }
     });
   } catch (error) {
-    console.error('Registration error:', error);
+    logServerError('Registration error:', error);
     const message =
       typeof error === 'object' && error && 'message' in error && typeof (error as any).message === 'string'
         ? (error as any).message

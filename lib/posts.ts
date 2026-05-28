@@ -70,30 +70,41 @@ export interface AdminData {
   };
 }
 
+function normalizePostStatus(post: any): PublicPost['status'] {
+  if (['draft', 'pending', 'published', 'rejected', 'returned'].includes(post.status)) {
+    return post.status;
+  }
+
+  return post.published ? 'published' : 'draft';
+}
+
 function serializePost(post: any): PublicPost {
+  const createdAt = post.createdAt ? new Date(post.createdAt) : new Date();
+  const updatedAt = post.updatedAt ? new Date(post.updatedAt) : createdAt;
+
   return {
     id: post._id.toString(),
-    title: post.title,
-    excerpt: post.excerpt,
-    content: post.content,
-    slug: post.slug,
+    title: post.title || 'Untitled essay',
+    excerpt: post.excerpt || '',
+    content: post.content || '',
+    slug: post.slug || post._id.toString(),
     coverImage: post.coverImage || undefined,
-    author: post.author,
+    author: post.author || 'Unknown author',
     authorId: post.authorId?.toString(),
     category: post.category || post.topics?.[0] || 'Campus Life',
     tags: post.tags?.length ? post.tags : post.topics || [],
-    status: post.status || (post.published ? 'published' : 'draft'),
+    status: normalizePostStatus(post),
     adminNotes: post.adminNotes || undefined,
     featured: !!post.featured,
     published: !!post.published,
-    publishedAt: post.publishedAt ? post.publishedAt.toISOString() : undefined,
-    reviewedAt: post.reviewedAt ? post.reviewedAt.toISOString() : undefined,
-    rejectedAt: post.rejectedAt ? post.rejectedAt.toISOString() : undefined,
-    returnedAt: post.returnedAt ? post.returnedAt.toISOString() : undefined,
-    featuredAt: post.featuredAt ? post.featuredAt.toISOString() : undefined,
-    statusChangedAt: post.statusChangedAt ? post.statusChangedAt.toISOString() : undefined,
-    createdAt: post.createdAt.toISOString(),
-    updatedAt: post.updatedAt.toISOString()
+    publishedAt: post.publishedAt ? new Date(post.publishedAt).toISOString() : undefined,
+    reviewedAt: post.reviewedAt ? new Date(post.reviewedAt).toISOString() : undefined,
+    rejectedAt: post.rejectedAt ? new Date(post.rejectedAt).toISOString() : undefined,
+    returnedAt: post.returnedAt ? new Date(post.returnedAt).toISOString() : undefined,
+    featuredAt: post.featuredAt ? new Date(post.featuredAt).toISOString() : undefined,
+    statusChangedAt: post.statusChangedAt ? new Date(post.statusChangedAt).toISOString() : undefined,
+    createdAt: createdAt.toISOString(),
+    updatedAt: updatedAt.toISOString()
   };
 }
 
@@ -278,6 +289,7 @@ export async function getEditablePost(id: string, userId: string, role: 'contrib
   if (!post) return null;
   const serialized = serializePost(post);
   if (role !== 'admin' && serialized.authorId !== userId) return null;
+  if (role !== 'admin' && !['draft', 'returned'].includes(serialized.status)) return null;
   return serialized;
 }
 
@@ -300,9 +312,10 @@ export async function getAdminData(): Promise<AdminData> {
     };
   }
   await connectToDatabase();
-  const [posts, users, comments, totalPosts, pendingPosts, publishedPosts, rejectedPosts, totalUsers, totalComments, pendingComments, subscribers] =
+  const [reviewPosts, recentPosts, users, comments, totalPosts, pendingPosts, publishedPosts, rejectedPosts, totalUsers, totalComments, pendingComments, subscribers] =
     await Promise.all([
-    Post.find({}).sort({ updatedAt: -1 }).limit(100).lean(),
+    Post.find({ status: { $in: ['pending', 'returned'] } }).sort({ updatedAt: -1 }).limit(60).lean(),
+    Post.find({ status: { $nin: ['pending', 'returned'] } }).sort({ updatedAt: -1 }).limit(40).lean(),
     User.find({}).sort({ createdAt: -1 }).select('-password').limit(100).lean(),
     Comment.find({}).sort({ updatedAt: -1 }).limit(100).lean(),
     Post.countDocuments({}),
@@ -314,6 +327,7 @@ export async function getAdminData(): Promise<AdminData> {
     Comment.countDocuments({ status: 'pending' }),
     NewsletterSubscriber.countDocuments({ active: true })
   ]);
+  const posts = [...reviewPosts, ...recentPosts];
 
   const profiles = await Promise.all(
     users.map(async (user) => {

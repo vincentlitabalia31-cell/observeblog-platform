@@ -4,6 +4,7 @@ import { connectToDatabase } from '../../../lib/mongodb';
 import { assertRateLimit, isValidEmail, normalizeEmail, sanitizePlainText } from '../../../lib/security';
 import { createUnsubscribeToken } from '../../../lib/newsletter';
 import { sendSubscriptionConfirmation } from '../../../lib/email';
+import { logServerError } from '../../../lib/logging';
 import NewsletterSubscriber from '../../../models/NewsletterSubscriber';
 
 export async function POST(request: Request) {
@@ -33,7 +34,10 @@ export async function POST(request: Request) {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    const emailResult = await sendSubscriptionConfirmation(email);
+    const emailResult = await sendSubscriptionConfirmation(email).catch((error) => {
+      logServerError('Subscription confirmation email failed:', error);
+      return { sent: false, reason: 'SEND_FAILED' };
+    });
 
     return NextResponse.json({
       message: 'Subscription saved.',
@@ -43,27 +47,32 @@ export async function POST(request: Request) {
     if (error instanceof Error && error.message === 'RATE_LIMITED') {
       return NextResponse.json({ error: 'Too many attempts. Please try again soon.' }, { status: 429 });
     }
-    console.error('Newsletter subscription failed:', error);
+    logServerError('Newsletter subscription failed:', error);
     return NextResponse.json({ error: 'Unable to save subscription.' }, { status: 500 });
   }
 }
 
 export async function DELETE(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const email = normalizeEmail(searchParams.get('email') || '');
-  const token = searchParams.get('token') || '';
+  try {
+    const { searchParams } = new URL(request.url);
+    const email = normalizeEmail(searchParams.get('email') || '');
+    const token = searchParams.get('token') || '';
 
-  if (!email || !token) {
-    return NextResponse.json({ error: 'Email and token are required.' }, { status: 400 });
+    if (!email || !token) {
+      return NextResponse.json({ error: 'Email and token are required.' }, { status: 400 });
+    }
+
+    await connectToDatabase();
+    const subscriber = await NewsletterSubscriber.findOneAndUpdate(
+      { email, unsubscribeToken: token },
+      { active: false },
+      { new: true }
+    );
+
+    if (!subscriber) return NextResponse.json({ error: 'Subscription not found.' }, { status: 404 });
+    return NextResponse.json({ message: 'You have been unsubscribed.' });
+  } catch (error) {
+    logServerError('Newsletter unsubscribe failed:', error);
+    return NextResponse.json({ error: 'Unable to unsubscribe.' }, { status: 500 });
   }
-
-  await connectToDatabase();
-  const subscriber = await NewsletterSubscriber.findOneAndUpdate(
-    { email, unsubscribeToken: token },
-    { active: false },
-    { new: true }
-  );
-
-  if (!subscriber) return NextResponse.json({ error: 'Subscription not found.' }, { status: 404 });
-  return NextResponse.json({ message: 'You have been unsubscribed.' });
 }

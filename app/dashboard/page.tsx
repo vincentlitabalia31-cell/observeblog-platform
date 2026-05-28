@@ -63,12 +63,9 @@ export default async function DashboardPage() {
             </div>
             <div className="grid gap-4">
               {posts.length ? (
-                posts.map((post) => (
-                  <Link
-                    key={post.id}
-                    href={`/dashboard/posts/${post.id}/edit`}
-                    className="rounded-lg border border-soft bg-slate-50 p-5 transition hover:border-ink"
-                  >
+                posts.map((post) => {
+                  const canEdit = post.status === 'draft' || post.status === 'returned' || session.user.role === 'admin';
+                  const content = (
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="text-sm uppercase tracking-[0.18em] text-soft">{post.status}</p>
@@ -81,8 +78,22 @@ export default async function DashboardPage() {
                       </div>
                       <span className="text-sm text-soft">{new Date(post.updatedAt).toLocaleDateString('en-IN')}</span>
                     </div>
-                  </Link>
-                ))
+                  );
+
+                  return canEdit ? (
+                    <Link
+                      key={post.id}
+                      href={`/dashboard/posts/${post.id}/edit`}
+                      className="rounded-lg border border-soft bg-slate-50 p-5 transition hover:border-ink"
+                    >
+                      {content}
+                    </Link>
+                  ) : (
+                    <div key={post.id} className="rounded-lg border border-soft bg-slate-50 p-5">
+                      {content}
+                    </div>
+                  );
+                })
               ) : (
                 <p className="text-sm leading-7 text-slate-600">No drafts yet. Your first essay starts above.</p>
               )}

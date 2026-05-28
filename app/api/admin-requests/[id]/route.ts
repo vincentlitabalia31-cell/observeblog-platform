@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../../lib/auth';
 import { updateAdminRequest } from '../../../../lib/roles';
+import { logServerError } from '../../../../lib/logging';
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -23,7 +24,7 @@ export async function PATCH(request: Request, { params }: Params) {
     await updateAdminRequest(id, action === 'approve' ? 'approved' : 'rejected');
     return NextResponse.json({ message: `Request ${action === 'approve' ? 'approved' : 'rejected'}.` });
   } catch (error) {
-    console.error('Admin request update failed:', error);
+    logServerError('Admin request update failed:', error);
     return NextResponse.json({ error: 'Unable to update admin request.' }, { status: 500 });
   }
 }

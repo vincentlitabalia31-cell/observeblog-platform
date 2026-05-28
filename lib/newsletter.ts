@@ -1,8 +1,9 @@
 import crypto from 'crypto';
 import { getFeaturedPosts, getRecentPosts } from './posts';
+import { getAuthSecret } from './env';
 
 export function createUnsubscribeToken(email: string) {
-  const secret = process.env.NEXTAUTH_SECRET || 'observing-india-dev-secret';
+  const secret = getAuthSecret();
   return crypto.createHmac('sha256', secret).update(email.toLowerCase().trim()).digest('hex');
 }
 

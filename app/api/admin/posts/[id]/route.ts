@@ -4,6 +4,8 @@ import { Types } from 'mongoose';
 import { authOptions } from '../../../../../lib/auth';
 import { connectToDatabase } from '../../../../../lib/mongodb';
 import { sendPostStatusEmail } from '../../../../../lib/email';
+import { logServerError } from '../../../../../lib/logging';
+import { sanitizePlainText } from '../../../../../lib/security';
 import Post from '../../../../../models/Post';
 import User from '../../../../../models/User';
 import Notification from '../../../../../models/Notification';
@@ -33,7 +35,12 @@ export async function PATCH(request: Request, { params }: Params) {
     let emailStatus: 'Approved' | 'Rejected' | 'Returned' | 'Featured' | null = null;
     let emailMessage: string | undefined;
     let emailHref: string | undefined;
-    const notes = typeof adminNotes === 'string' ? adminNotes.trim() : '';
+    const notes = typeof adminNotes === 'string' ? sanitizePlainText(adminNotes, 5000) : '';
+    const hasStatusAction = ['approve', 'reject', 'return'].includes(action);
+
+    if (!hasStatusAction && typeof featured !== 'boolean') {
+      return NextResponse.json({ error: 'Invalid moderation update.' }, { status: 400 });
+    }
 
     if (action === 'approve') {
       post.status = 'published';
@@ -104,26 +111,36 @@ export async function PATCH(request: Request, { params }: Params) {
 
     await post.save();
     if (emailStatus) {
-      const author = await User.findById(post.authorId).select('email');
-      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || '';
-      const href = emailHref && baseUrl ? new URL(emailHref, baseUrl).toString() : undefined;
+      const notificationEmail = {
+        status: emailStatus,
+        message: emailMessage,
+        href: emailHref,
+        adminNotes: emailStatus === 'Returned' || emailStatus === 'Rejected' ? post.adminNotes : undefined
+      };
 
-      if (author?.email) {
-        void sendPostStatusEmail({
+      void (async () => {
+        const author = await User.findById(post.authorId).select('email');
+        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || '';
+        const href = notificationEmail.href && baseUrl ? new URL(notificationEmail.href, baseUrl).toString() : undefined;
+
+        if (!author?.email) return;
+
+        await sendPostStatusEmail({
           to: author.email,
           title: post.title,
-          status: emailStatus,
-          message: emailMessage,
-          adminNotes: emailStatus === 'Returned' || emailStatus === 'Rejected' ? post.adminNotes : undefined,
+          status: notificationEmail.status,
+          message: notificationEmail.message,
+          adminNotes: notificationEmail.adminNotes,
           href
-        }).catch((error) => {
-          console.error('Post status email failed:', error);
         });
-      }
+      })().catch((error) => {
+        logServerError('Post status email failed:', error);
+      });
     }
 
     return NextResponse.json({ message: 'Post moderation updated.', post });
   } catch (error) {
+    logServerError('Post moderation update failed:', error);
     return NextResponse.json({ error: 'Unable to update moderation state.' }, { status: 500 });
   }
 }

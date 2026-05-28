@@ -4,9 +4,10 @@ import { connectToDatabase } from './mongodb';
 import User from '../models/User';
 import bcrypt from 'bcryptjs';
 import { getRoleForUser, persistEffectiveRole } from './roles';
+import { getAuthSecret } from './env';
 
 export const authOptions: NextAuthOptions = {
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: getAuthSecret(),
   session: {
     strategy: 'jwt',
     maxAge: 60 * 60 * 24 * 30

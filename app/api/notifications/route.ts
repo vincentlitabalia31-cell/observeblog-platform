@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../lib/auth';
 import { connectToDatabase } from '../../../lib/mongodb';
+import { logServerError } from '../../../lib/logging';
 import Notification from '../../../models/Notification';
 
 export async function GET() {
@@ -10,9 +11,14 @@ export async function GET() {
     return NextResponse.json({ notifications: [] });
   }
 
-  await connectToDatabase();
-  const notifications = await Notification.find({ userId: session.user.id }).sort({ createdAt: -1 }).limit(20).lean();
-  return NextResponse.json({ notifications });
+  try {
+    await connectToDatabase();
+    const notifications = await Notification.find({ userId: session.user.id }).sort({ createdAt: -1 }).limit(20).lean();
+    return NextResponse.json({ notifications });
+  } catch (error) {
+    logServerError('Notifications fetch failed:', error);
+    return NextResponse.json({ notifications: [] });
+  }
 }
 
 export async function PATCH() {
@@ -21,7 +27,12 @@ export async function PATCH() {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
 
-  await connectToDatabase();
-  await Notification.updateMany({ userId: session.user.id, read: false }, { read: true });
-  return NextResponse.json({ message: 'Notifications marked as read.' });
+  try {
+    await connectToDatabase();
+    await Notification.updateMany({ userId: session.user.id, read: false }, { read: true });
+    return NextResponse.json({ message: 'Notifications marked as read.' });
+  } catch (error) {
+    logServerError('Notifications mark-read failed:', error);
+    return NextResponse.json({ error: 'Unable to update notifications.' }, { status: 500 });
+  }
 }

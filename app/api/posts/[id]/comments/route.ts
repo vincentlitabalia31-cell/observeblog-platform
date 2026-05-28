@@ -4,6 +4,7 @@ import { Types } from 'mongoose';
 import { authOptions } from '../../../../../lib/auth';
 import { connectToDatabase } from '../../../../../lib/mongodb';
 import { assertRateLimit, sanitizePlainText } from '../../../../../lib/security';
+import { logServerError } from '../../../../../lib/logging';
 import Comment from '../../../../../models/Comment';
 import Post from '../../../../../models/Post';
 import Notification from '../../../../../models/Notification';
@@ -18,9 +19,14 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: 'Invalid post id.' }, { status: 400 });
   }
 
-  await connectToDatabase();
-  const comments = await Comment.find({ postId: id, status: 'approved' }).sort({ createdAt: 1 }).lean();
-  return NextResponse.json({ comments });
+  try {
+    await connectToDatabase();
+    const comments = await Comment.find({ postId: id, status: 'approved' }).sort({ createdAt: 1 }).lean();
+    return NextResponse.json({ comments });
+  } catch (error) {
+    logServerError('Comments fetch failed:', error);
+    return NextResponse.json({ comments: [] });
+  }
 }
 
 export async function POST(request: Request, { params }: Params) {
@@ -82,6 +88,7 @@ export async function POST(request: Request, { params }: Params) {
     if (error instanceof Error && error.message === 'RATE_LIMITED') {
       return NextResponse.json({ error: 'Too many comments. Please slow down.' }, { status: 429 });
     }
+    logServerError('Comment create failed:', error);
     return NextResponse.json({ error: 'Unable to save comment.' }, { status: 500 });
   }
 }

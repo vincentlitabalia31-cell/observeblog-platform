@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { getServerSession } from 'next-auth/next';
 import Navigation from '../../components/Navigation';
 import { PostModerationControls, UserRoleControl } from '../../components/AdminControls';
@@ -59,6 +60,12 @@ export default async function AdminPage() {
                         })}
                       </p>
                     </div>
+                    <Link
+                      href={`/dashboard/posts/${post.id}/edit`}
+                      className="rounded-full border border-soft px-4 py-2 text-xs font-semibold text-ink transition hover:border-ink"
+                    >
+                      Edit
+                    </Link>
                   </div>
                   {post.adminNotes ? (
                     <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
