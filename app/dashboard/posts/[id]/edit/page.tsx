@@ -25,6 +25,12 @@ export default async function EditPostPage({ params }: Params) {
           <p className="text-sm uppercase tracking-[0.18em] text-soft">Editing / {post.status}</p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight text-ink">{post.title}</h1>
         </div>
+        {post.status === 'returned' && post.adminNotes ? (
+          <div className="mb-8 rounded-lg border border-amber-200 bg-amber-50 p-6">
+            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-amber-800">Admin feedback</p>
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-amber-950">{post.adminNotes}</p>
+          </div>
+        ) : null}
         <PostEditor post={post} />
       </section>
     </main>

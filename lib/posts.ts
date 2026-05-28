@@ -18,10 +18,16 @@ export interface PublicPost {
   authorId: string;
   category: string;
   tags: string[];
-  status: 'draft' | 'pending' | 'published' | 'rejected';
+  status: 'draft' | 'pending' | 'published' | 'rejected' | 'returned';
+  adminNotes?: string;
   featured: boolean;
   published: boolean;
   publishedAt?: string;
+  reviewedAt?: string;
+  rejectedAt?: string;
+  returnedAt?: string;
+  featuredAt?: string;
+  statusChangedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -77,9 +83,15 @@ function serializePost(post: any): PublicPost {
     category: post.category || post.topics?.[0] || 'Campus Life',
     tags: post.tags?.length ? post.tags : post.topics || [],
     status: post.status || (post.published ? 'published' : 'draft'),
+    adminNotes: post.adminNotes || undefined,
     featured: !!post.featured,
     published: !!post.published,
     publishedAt: post.publishedAt ? post.publishedAt.toISOString() : undefined,
+    reviewedAt: post.reviewedAt ? post.reviewedAt.toISOString() : undefined,
+    rejectedAt: post.rejectedAt ? post.rejectedAt.toISOString() : undefined,
+    returnedAt: post.returnedAt ? post.returnedAt.toISOString() : undefined,
+    featuredAt: post.featuredAt ? post.featuredAt.toISOString() : undefined,
+    statusChangedAt: post.statusChangedAt ? post.statusChangedAt.toISOString() : undefined,
     createdAt: post.createdAt.toISOString(),
     updatedAt: post.updatedAt.toISOString()
   };

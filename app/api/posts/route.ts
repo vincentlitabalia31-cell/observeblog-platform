@@ -43,6 +43,7 @@ export async function POST(request: Request) {
     const wantsPublish = publishAction === 'publish';
     const status = session.user.role === 'admin' && wantsPublish ? 'published' : wantsPublish ? 'pending' : 'draft';
     const authorId = session.user.id;
+    const now = new Date();
     const post = await Post.create({
       title: title.trim(),
       excerpt: excerpt.trim(),
@@ -55,7 +56,8 @@ export async function POST(request: Request) {
       authorId,
       status,
       published: status === 'published',
-      publishedAt: status === 'published' ? new Date() : undefined
+      publishedAt: status === 'published' ? now : undefined,
+      statusChangedAt: now
     });
 
     return NextResponse.json({ message: status === 'draft' ? 'Draft saved successfully.' : 'Post submitted successfully.', post });

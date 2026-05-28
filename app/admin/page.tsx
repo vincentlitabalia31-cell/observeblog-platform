@@ -4,6 +4,7 @@ import Navigation from '../../components/Navigation';
 import { PostModerationControls, UserRoleControl } from '../../components/AdminControls';
 import AdminCommentControls from '../../components/AdminCommentControls';
 import AdminRequestControls from '../../components/AdminRequestControls';
+import MarkdownRenderer from '../../components/MarkdownRenderer';
 import { authOptions } from '../../lib/auth';
 import { getAdminData } from '../../lib/posts';
 import { listAdminRequests } from '../../lib/roles';
@@ -50,8 +51,24 @@ export default async function AdminPage() {
                         {post.status} / {post.category} {post.featured ? '/ featured' : ''}
                       </p>
                       <h3 className="mt-2 text-lg font-semibold text-ink">{post.title}</h3>
-                      <p className="mt-2 text-sm text-soft">{post.author}</p>
+                      <p className="mt-2 text-sm text-soft">
+                        {post.author} / Updated{' '}
+                        {new Date(post.updatedAt).toLocaleString('en-IN', {
+                          dateStyle: 'medium',
+                          timeStyle: 'short'
+                        })}
+                      </p>
                     </div>
+                  </div>
+                  {post.adminNotes ? (
+                    <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">Admin notes</p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-amber-950">{post.adminNotes}</p>
+                    </div>
+                  ) : null}
+                  <div className="mb-4 border-t border-soft pt-4">
+                    <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-soft">Full article</p>
+                    <MarkdownRenderer content={post.content} />
                   </div>
                   <PostModerationControls id={post.id} featured={post.featured} />
                 </article>

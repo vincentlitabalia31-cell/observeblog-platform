@@ -19,7 +19,8 @@ export default async function DashboardPage() {
     draft: posts.filter((post) => post.status === 'draft').length,
     pending: posts.filter((post) => post.status === 'pending').length,
     published: posts.filter((post) => post.status === 'published').length,
-    rejected: posts.filter((post) => post.status === 'rejected').length
+    rejected: posts.filter((post) => post.status === 'rejected').length,
+    returned: posts.filter((post) => post.status === 'returned').length
   };
 
   return (
@@ -41,7 +42,7 @@ export default async function DashboardPage() {
             <p className="mt-2 text-sm leading-7 text-slate-600">
               {session.user.email} / {session.user.role}
             </p>
-            <div className="mt-6 grid gap-3 sm:grid-cols-4">
+            <div className="mt-6 grid gap-3 sm:grid-cols-5">
               {Object.entries(stats).map(([label, value]) => (
                 <div key={label} className="rounded-lg border border-soft bg-paper p-4">
                   <p className="text-2xl font-semibold text-ink">{value}</p>
@@ -72,6 +73,11 @@ export default async function DashboardPage() {
                       <div>
                         <p className="text-sm uppercase tracking-[0.18em] text-soft">{post.status}</p>
                         <h3 className="mt-2 text-lg font-semibold text-ink">{post.title}</h3>
+                        {post.status === 'returned' && post.adminNotes ? (
+                          <p className="mt-3 whitespace-pre-wrap rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-950">
+                            {post.adminNotes}
+                          </p>
+                        ) : null}
                       </div>
                       <span className="text-sm text-soft">{new Date(post.updatedAt).toLocaleDateString('en-IN')}</span>
                     </div>

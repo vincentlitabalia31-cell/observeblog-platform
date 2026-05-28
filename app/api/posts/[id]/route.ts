@@ -51,12 +51,15 @@ export async function PATCH(request: Request, { params }: Params) {
     if (body.publishAction === 'draft') {
       post.status = 'draft';
       post.published = false;
+      post.statusChangedAt = new Date();
     }
 
     if (body.publishAction === 'publish') {
+      const now = new Date();
       post.status = session.user.role === 'admin' ? 'published' : 'pending';
       post.published = post.status === 'published';
-      post.publishedAt = post.status === 'published' ? new Date() : post.publishedAt;
+      post.publishedAt = post.status === 'published' ? now : post.publishedAt;
+      post.statusChangedAt = now;
     }
 
     await post.save();
