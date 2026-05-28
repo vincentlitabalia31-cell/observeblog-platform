@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth/next';
 import Navigation from '../../components/Navigation';
 import { PostModerationControls, UserRoleControl } from '../../components/AdminControls';
+import AdminCommentControls from '../../components/AdminCommentControls';
 import { authOptions } from '../../lib/auth';
 import { getAdminData } from '../../lib/posts';
 
@@ -10,7 +11,7 @@ export default async function AdminPage() {
   if (!session?.user) redirect('/login?callbackUrl=/admin');
   if (session.user.role !== 'admin') redirect('/dashboard');
 
-  const { posts, users } = await getAdminData();
+  const { posts, users, comments, stats } = await getAdminData();
 
   return (
     <main className="min-h-screen bg-paper text-ink">
@@ -19,6 +20,20 @@ export default async function AdminPage() {
         <div className="mb-10">
           <p className="text-sm uppercase tracking-[0.18em] text-soft">Admin</p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight text-ink">Moderation desk</h1>
+        </div>
+
+        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            ['Pending posts', stats.pendingPosts],
+            ['Published', stats.publishedPosts],
+            ['Pending comments', stats.pendingComments],
+            ['Subscribers', stats.subscribers]
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-lg border border-soft bg-white p-5 shadow-panel">
+              <p className="text-3xl font-semibold text-ink">{value}</p>
+              <p className="mt-2 text-xs uppercase tracking-[0.14em] text-soft">{label}</p>
+            </div>
+          ))}
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[1.35fr_0.9fr]">
@@ -43,21 +58,40 @@ export default async function AdminPage() {
             </div>
           </section>
 
-          <section className="rounded-lg border border-soft bg-white p-6 shadow-panel">
-            <h2 className="text-2xl font-semibold text-ink">Users</h2>
-            <div className="mt-6 grid gap-4">
-              {users.map((user) => (
-                <div key={user.id} className="rounded-lg border border-soft bg-slate-50 p-5">
-                  <p className="font-semibold text-ink">{user.name}</p>
-                  <p className="mt-1 text-sm text-soft">{user.email}</p>
-                  <div className="mt-4">
-                    <UserRoleControl id={user.id} role={user.role} />
+          <div className="grid gap-8">
+            <section className="rounded-lg border border-soft bg-white p-6 shadow-panel">
+              <h2 className="text-2xl font-semibold text-ink">Users</h2>
+              <div className="mt-6 grid gap-4">
+                {users.map((user) => (
+                  <div key={user.id} className="rounded-lg border border-soft bg-slate-50 p-5">
+                    <p className="font-semibold text-ink">{user.name}</p>
+                    <p className="mt-1 text-sm text-soft">{user.email}</p>
+                    <div className="mt-4">
+                      <UserRoleControl id={user.id} role={user.role} />
+                    </div>
                   </div>
-                </div>
-              ))}
-              {!users.length ? <p className="text-sm text-soft">No users yet.</p> : null}
-            </div>
-          </section>
+                ))}
+                {!users.length ? <p className="text-sm text-soft">No users yet.</p> : null}
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-soft bg-white p-6 shadow-panel">
+              <h2 className="text-2xl font-semibold text-ink">Comments</h2>
+              <div className="mt-6 grid gap-4">
+                {comments.map((comment) => (
+                  <article key={comment.id} className="rounded-lg border border-soft bg-slate-50 p-5">
+                    <p className="text-xs uppercase tracking-[0.18em] text-soft">{comment.status}</p>
+                    <p className="mt-3 text-sm leading-7 text-slate-700">{comment.body}</p>
+                    <p className="mt-3 text-sm font-semibold text-ink">{comment.authorName}</p>
+                    <div className="mt-4">
+                      <AdminCommentControls id={comment.id} />
+                    </div>
+                  </article>
+                ))}
+                {!comments.length ? <p className="text-sm text-soft">No comments yet.</p> : null}
+              </div>
+            </section>
+          </div>
         </div>
       </section>
     </main>

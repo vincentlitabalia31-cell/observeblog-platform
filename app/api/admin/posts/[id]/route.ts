@@ -4,6 +4,7 @@ import { Types } from 'mongoose';
 import { authOptions } from '../../../../../lib/auth';
 import { connectToDatabase } from '../../../../../lib/mongodb';
 import Post from '../../../../../models/Post';
+import Notification from '../../../../../models/Notification';
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -30,15 +31,32 @@ export async function PATCH(request: Request, { params }: Params) {
       post.status = 'published';
       post.published = true;
       post.publishedAt = post.publishedAt || new Date();
+      await Notification.create({
+        userId: post.authorId,
+        message: `Your essay "${post.title}" was approved.`,
+        href: `/posts/${post.slug}`
+      });
     }
 
     if (action === 'reject') {
       post.status = 'rejected';
       post.published = false;
+      await Notification.create({
+        userId: post.authorId,
+        message: `Your essay "${post.title}" was returned by moderation.`,
+        href: `/dashboard/posts/${post._id.toString()}/edit`
+      });
     }
 
     if (typeof featured === 'boolean') {
       post.featured = featured;
+      if (featured) {
+        await Notification.create({
+          userId: post.authorId,
+          message: `Your essay "${post.title}" was featured.`,
+          href: `/posts/${post.slug}`
+        });
+      }
     }
 
     await post.save();

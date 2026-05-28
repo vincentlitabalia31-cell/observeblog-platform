@@ -55,6 +55,21 @@ export default function PostEditor({ post }: PostEditorProps) {
     router.refresh();
   };
 
+  const handleDelete = async () => {
+    if (!post || !window.confirm('Delete this essay permanently?')) return;
+    setIsSaving(true);
+    setStatus('Deleting...');
+    const response = await fetch(`/api/posts/${post.id}`, { method: 'DELETE' });
+    const data = await response.json();
+    setIsSaving(false);
+    if (!response.ok) {
+      setStatus(data.error || 'Unable to delete post.');
+      return;
+    }
+    router.push('/dashboard');
+    router.refresh();
+  };
+
   return (
     <form
       onSubmit={(event) => {
@@ -143,6 +158,16 @@ export default function PostEditor({ post }: PostEditorProps) {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-soft">{status || 'Drafts stay private until submitted for review.'}</p>
         <div className="flex flex-col gap-3 sm:flex-row">
+          {post ? (
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={() => void handleDelete()}
+              className="rounded-full border border-soft bg-white px-6 py-3 text-sm font-semibold text-ink transition hover:border-ink disabled:opacity-60"
+            >
+              Delete
+            </button>
+          ) : null}
           <button
             type="submit"
             disabled={isSaving}

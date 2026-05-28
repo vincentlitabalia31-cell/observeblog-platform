@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { signOut, useSession } from 'next-auth/react';
+import NotificationDropdown from './NotificationDropdown';
 
 export default function Navigation() {
   const { data: session } = useSession();
@@ -12,9 +13,12 @@ export default function Navigation() {
         <Link href="/" className="text-lg font-semibold tracking-tight text-ink">
           Observing India
         </Link>
-        <nav className="flex items-center gap-4 text-sm text-soft">
+        <nav className="flex items-center gap-3 text-sm text-soft sm:gap-4">
           <Link href="/posts" className="hover:text-ink transition-colors">
             Essays
+          </Link>
+          <Link href="/search" className="hidden hover:text-ink transition-colors sm:inline">
+            Search
           </Link>
           <Link href="/archive" className="hidden hover:text-ink transition-colors sm:inline">
             Archive
@@ -30,6 +34,7 @@ export default function Navigation() {
               Admin
             </Link>
           ) : null}
+          <NotificationDropdown />
           {session?.user ? (
             <button
               type="button"

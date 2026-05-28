@@ -22,7 +22,7 @@ export async function PATCH(request: Request, { params }: Params) {
 
   try {
     const { role } = await request.json();
-    if (!['user', 'admin'].includes(role)) {
+    if (!['contributor', 'admin'].includes(role)) {
       return NextResponse.json({ error: 'Invalid role.' }, { status: 400 });
     }
 

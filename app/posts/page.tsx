@@ -1,5 +1,6 @@
 import Navigation from '../../components/Navigation';
 import EditorialCard from '../../components/EditorialCard';
+import NewsletterForm from '../../components/NewsletterForm';
 import { getAllPublicPosts } from '../../lib/posts';
 
 export default async function PostsPage() {
@@ -28,6 +29,10 @@ export default async function PostsPage() {
               category={post.category}
             />
           ))}
+          {!posts.length ? <p className="text-sm text-soft">No published essays yet.</p> : null}
+        </div>
+        <div className="mt-12">
+          <NewsletterForm />
         </div>
       </section>
     </main>

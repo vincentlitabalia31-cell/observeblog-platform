@@ -7,6 +7,7 @@ const config: Config = {
       colors: {
         ink: '#1f1f1f',
         paper: '#f7f5ef',
+        secondary: '#3a3a3a',
         soft: '#756f68',
         clay: '#9d6b53',
         sage: '#7d8a73'

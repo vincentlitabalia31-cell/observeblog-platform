@@ -2,6 +2,7 @@ import Link from 'next/link';
 import Navigation from '../components/Navigation';
 import SectionHeader from '../components/SectionHeader';
 import FeaturedPostCard from '../components/FeaturedPostCard';
+import NewsletterForm from '../components/NewsletterForm';
 import { getFeaturedPosts, getRecentPosts } from '../lib/posts';
 
 export default async function HomePage() {
@@ -72,6 +73,9 @@ export default async function HomePage() {
               tags={post.tags || []}
             />
           ))}
+        </div>
+        <div className="mt-12">
+          <NewsletterForm />
         </div>
       </section>
     </main>

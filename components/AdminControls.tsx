@@ -38,11 +38,11 @@ export function PostModerationControls({ id, featured }: { id: string; featured:
   );
 }
 
-export function UserRoleControl({ id, role }: { id: string; role: 'user' | 'admin' }) {
+export function UserRoleControl({ id, role }: { id: string; role: 'contributor' | 'admin' }) {
   const router = useRouter();
   const [status, setStatus] = useState<string | null>(null);
 
-  async function update(nextRole: 'user' | 'admin') {
+  async function update(nextRole: 'contributor' | 'admin') {
     setStatus('Updating...');
     const response = await fetch(`/api/admin/users/${id}`, {
       method: 'PATCH',
@@ -58,10 +58,10 @@ export function UserRoleControl({ id, role }: { id: string; role: 'user' | 'admi
     <div className="flex items-center gap-2">
       <select
         value={role}
-        onChange={(event) => void update(event.target.value as 'user' | 'admin')}
+        onChange={(event) => void update(event.target.value as 'contributor' | 'admin')}
         className="rounded-lg border border-soft bg-white px-3 py-2 text-xs text-ink"
       >
-        <option value="user">User</option>
+        <option value="contributor">Contributor</option>
         <option value="admin">Admin</option>
       </select>
       {status ? <span className="text-xs text-soft">{status}</span> : null}

@@ -4,7 +4,7 @@ export interface IUser {
   name: string;
   email: string;
   password: string;
-  role: 'user' | 'admin';
+  role: 'contributor' | 'admin';
   bio?: string;
   affiliation?: string;
   image?: string;
@@ -17,7 +17,7 @@ const UserSchema = new Schema<IUser>(
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true },
-    role: { type: String, enum: ['user', 'admin'], default: 'user' },
+    role: { type: String, enum: ['contributor', 'admin'], default: 'contributor' },
     bio: { type: String, default: '' },
     affiliation: { type: String, default: '' },
     image: { type: String }
