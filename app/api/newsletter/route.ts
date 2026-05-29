@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const email = normalizeEmail(String(body.email || ''));
     const name = sanitizePlainText(String(body.name || ''), 120);
-    const frequency = body.frequency === 'daily' ? 'daily' : 'weekly';
+    const frequency = ['immediate', 'daily', 'weekly'].includes(body.frequency) ? body.frequency : 'weekly';
 
     assertRateLimit(`newsletter:${email}`, 5, 60_000);
 
@@ -21,7 +21,15 @@ export async function POST(request: Request) {
     }
 
     await connectToDatabase();
-    const unsubscribeToken = createUnsubscribeToken(`${email}:${crypto.randomUUID()}`);
+    const existingSubscriber = await NewsletterSubscriber.findOne({ email })
+      .select('unsubscribeToken active')
+      .lean<{ unsubscribeToken?: string; active?: boolean }>();
+
+    if (existingSubscriber?.active) {
+      return NextResponse.json({ message: 'You are already subscribed with this email.' });
+    }
+
+    const unsubscribeToken = existingSubscriber?.unsubscribeToken || createUnsubscribeToken(`${email}:${crypto.randomUUID()}`);
     await NewsletterSubscriber.findOneAndUpdate(
       { email },
       {

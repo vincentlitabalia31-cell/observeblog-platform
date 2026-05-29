@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getServerSession } from 'next-auth/next';
 import Navigation from '../../components/Navigation';
-import { PostModerationControls, UserRoleControl } from '../../components/AdminControls';
+import { PostModerationControls, SubscriberDeleteControl, UserModerationControls } from '../../components/AdminControls';
 import AdminCommentControls from '../../components/AdminCommentControls';
 import AdminRequestControls from '../../components/AdminRequestControls';
 import MarkdownRenderer from '../../components/MarkdownRenderer';
@@ -10,12 +10,17 @@ import { authOptions } from '../../lib/auth';
 import { getAdminData } from '../../lib/posts';
 import { listAdminRequests } from '../../lib/roles';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect('/login?callbackUrl=/admin');
   if (session.user.role !== 'admin') redirect('/dashboard');
 
-  const [{ posts, users, comments, stats }, adminRequests] = await Promise.all([getAdminData(), listAdminRequests()]);
+  const [{ posts, users, subscribers, comments, stats }, adminRequests] = await Promise.all([
+    getAdminData(),
+    listAdminRequests()
+  ]);
 
   return (
     <main className="min-h-screen bg-paper text-ink">
@@ -49,7 +54,8 @@ export default async function AdminPage() {
                   <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="text-xs uppercase tracking-[0.18em] text-soft">
-                        {post.status} / {post.category} {post.featured ? '/ featured' : ''}
+                        {post.status} / {post.published ? 'public' : 'hidden'} / {post.category}
+                        {post.featured ? ' / featured' : ''}
                       </p>
                       <h3 className="mt-2 text-lg font-semibold text-ink">{post.title}</h3>
                       <p className="mt-2 text-sm text-soft">
@@ -77,7 +83,12 @@ export default async function AdminPage() {
                     <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-soft">Full article</p>
                     <MarkdownRenderer content={post.content} />
                   </div>
-                  <PostModerationControls id={post.id} featured={post.featured} />
+                  <PostModerationControls
+                    id={post.id}
+                    featured={post.featured}
+                    published={post.published}
+                    status={post.status}
+                  />
                 </article>
               ))}
               {!posts.length ? <p className="text-sm text-soft">No posts yet.</p> : null}
@@ -118,11 +129,34 @@ export default async function AdminPage() {
                     <p className="font-semibold text-ink">{user.name}</p>
                     <p className="mt-1 text-sm text-soft">{user.email}</p>
                     <div className="mt-4">
-                      <UserRoleControl id={user.id} role={user.role} />
+                      <UserModerationControls id={user.id} role={user.role} suspended={user.suspended} />
                     </div>
                   </div>
                 ))}
                 {!users.length ? <p className="text-sm text-soft">No users yet.</p> : null}
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-soft bg-white p-6 shadow-panel">
+              <h2 className="text-2xl font-semibold text-ink">Newsletter subscribers</h2>
+              <div className="mt-6 grid gap-4">
+                {subscribers.map((subscriber) => (
+                  <div key={subscriber.id} className="rounded-lg border border-soft bg-slate-50 p-5">
+                    <p className="font-semibold text-ink">{subscriber.email}</p>
+                    <p className="mt-1 text-sm text-soft">
+                      Subscribed{' '}
+                      {new Date(subscriber.createdAt).toLocaleDateString('en-IN', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </p>
+                    <div className="mt-4">
+                      <SubscriberDeleteControl id={subscriber.id} email={subscriber.email} />
+                    </div>
+                  </div>
+                ))}
+                {!subscribers.length ? <p className="text-sm text-soft">No subscribers yet.</p> : null}
               </div>
             </section>
 

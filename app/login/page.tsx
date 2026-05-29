@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import PasswordInput from '../../components/PasswordInput';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -54,16 +55,13 @@ export default function LoginPage() {
                 required
               />
             </label>
-            <label className="block text-sm font-medium text-ink">
-              Password
-              <input
-                type="password"
-                value={form.password}
-                onChange={(event) => setForm({ ...form, password: event.target.value })}
-                className="mt-2 w-full rounded-lg border border-soft bg-slate-50 px-4 py-3 text-sm text-ink outline-none transition focus:border-ink"
-                required
-              />
-            </label>
+            <PasswordInput
+              label="Password"
+              value={form.password}
+              onChange={(event) => setForm({ ...form, password: event.target.value })}
+              autoComplete="current-password"
+              required
+            />
             <div className="text-right text-sm">
               <Link href="/forgot-password" className="font-semibold text-ink underline-offset-4 hover:underline">
                 Forgot password?

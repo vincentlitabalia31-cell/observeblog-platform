@@ -10,6 +10,9 @@ export interface IUser {
   bio?: string;
   affiliation?: string;
   image?: string;
+  suspended?: boolean;
+  suspendedAt?: Date;
+  suspensionReason?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,7 +27,10 @@ const UserSchema = new Schema<IUser>(
     passwordResetExpires: { type: Date },
     bio: { type: String, default: '' },
     affiliation: { type: String, default: '' },
-    image: { type: String }
+    image: { type: String },
+    suspended: { type: Boolean, default: false, index: true },
+    suspendedAt: { type: Date },
+    suspensionReason: { type: String, trim: true, maxlength: 500 }
   },
   { timestamps: true }
 );

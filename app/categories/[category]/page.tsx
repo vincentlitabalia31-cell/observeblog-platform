@@ -6,6 +6,8 @@ interface Params {
   params: Promise<{ category: string }>;
 }
 
+export const dynamic = 'force-dynamic';
+
 function titleize(value: string) {
   return decodeURIComponent(value)
     .split('-')

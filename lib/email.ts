@@ -23,7 +23,7 @@ function logEmailError(message: string, error: unknown) {
 }
 
 export function isSmtpConfigured() {
-  return Boolean(getEmailEnv('EMAIL_USER') && getEmailEnv('EMAIL_PASS'));
+  return getEmailEnv('EMAIL_USER') === NOREPLY_EMAIL && Boolean(getEmailEnv('EMAIL_PASS'));
 }
 
 export function isResendConfigured() {
@@ -36,14 +36,7 @@ export function isEmailConfigured() {
 
 /** All transactional mail sends from observe.noreply@gmail.com (Vercel Gmail SMTP). */
 function getFromAddress() {
-  const emailUser = getEmailEnv('EMAIL_USER') || NOREPLY_EMAIL;
-  const explicitFrom = getEmailEnv('EMAIL_FROM') || getEmailEnv('NEWSLETTER_FROM');
-
-  if (explicitFrom && explicitFrom.includes('@')) {
-    return explicitFrom.includes('<') ? explicitFrom : `Observing India <${explicitFrom}>`;
-  }
-
-  return `Observing India <${emailUser.includes('@') ? emailUser : NOREPLY_EMAIL}>`;
+  return `Observing India <${NOREPLY_EMAIL}>`;
 }
 
 function normalizeGmailAppPassword(value?: string) {
@@ -137,7 +130,7 @@ export async function sendMail(options: {
 }): Promise<EmailSendResult> {
   if (!isEmailConfigured()) {
     const message =
-      'Email provider is not configured. Set EMAIL_USER and EMAIL_PASS (Gmail) on Vercel, or RESEND_API_KEY.';
+      'Email provider is not configured. Set EMAIL_USER=observe.noreply@gmail.com and EMAIL_PASS (Gmail app password) on Vercel, or RESEND_API_KEY.';
     logEmailError('Email skipped: provider not configured.', new Error('EMAIL_NOT_CONFIGURED'));
     return { sent: false, reason: 'EMAIL_NOT_CONFIGURED', message };
   }

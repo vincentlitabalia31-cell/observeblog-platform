@@ -5,6 +5,9 @@ import { authOptions } from '../../../../lib/auth';
 import { connectToDatabase } from '../../../../lib/mongodb';
 import { sanitizePlainText } from '../../../../lib/security';
 import { logServerError } from '../../../../lib/logging';
+import { sendPublishedEssayToSubscribers } from '../../../../lib/newsletter';
+import { revalidateEditorialSurfaces } from '../../../../lib/revalidate';
+import { isUserSuspended } from '../../../../lib/users';
 import Post from '../../../../models/Post';
 
 interface Params {
@@ -29,6 +32,7 @@ export async function PATCH(request: Request, { params }: Params) {
     await connectToDatabase();
     const post = await Post.findById(id);
     if (!post) return NextResponse.json({ error: 'Post not found.' }, { status: 404 });
+    const wasPublished = post.published && post.status === 'published';
 
     const ownsPost = post.authorId.toString() === session.user.id;
     const isAdmin = session.user.role === 'admin';
@@ -39,6 +43,13 @@ export async function PATCH(request: Request, { params }: Params) {
     }
 
     const body = await request.json();
+
+    if (!isAdmin && (await isUserSuspended(session.user.id))) {
+      return NextResponse.json(
+        { error: 'Your account is suspended. You cannot create or submit essays. Contact the editorial team.' },
+        { status: 403 }
+      );
+    }
     if (body.publishAction && !['draft', 'publish'].includes(body.publishAction)) {
       return NextResponse.json({ error: 'Invalid publish action.' }, { status: 400 });
     }
@@ -75,7 +86,13 @@ export async function PATCH(request: Request, { params }: Params) {
     }
 
     await post.save();
-    return NextResponse.json({ message: 'Post updated successfully.', post });
+    const becamePublished = !wasPublished && post.published && post.status === 'published';
+    const visibilityChanged = wasPublished !== (post.published && post.status === 'published');
+    const subscriberDelivery = becamePublished ? await sendPublishedEssayToSubscribers(post) : undefined;
+    if (becamePublished || visibilityChanged) {
+      revalidateEditorialSurfaces(post.slug);
+    }
+    return NextResponse.json({ message: 'Post updated successfully.', post, subscriberDelivery });
   } catch (error) {
     logServerError('Post update failed:', error);
     return NextResponse.json({ error: 'Unable to update post.' }, { status: 500 });

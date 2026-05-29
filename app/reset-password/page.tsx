@@ -3,17 +3,25 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import PasswordInput from '../../components/PasswordInput';
 
 export default function ResetPasswordPage() {
   const searchParams = useSearchParams();
   const token = useMemo(() => searchParams.get('token') || '', [searchParams]);
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [status, setStatus] = useState<string | null>(token ? null : 'This reset link is invalid or has expired.');
   const [isComplete, setIsComplete] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (password !== confirmPassword) {
+      setStatus('Passwords do not match.');
+      return;
+    }
+
     setIsSubmitting(true);
     setStatus('Updating password...');
 
@@ -33,6 +41,7 @@ export default function ResetPasswordPage() {
 
     setIsComplete(true);
     setPassword('');
+    setConfirmPassword('');
     setStatus(data.message || 'Password updated successfully. You can now sign in.');
   };
 
@@ -47,17 +56,22 @@ export default function ResetPasswordPage() {
 
           {!isComplete && token ? (
             <form onSubmit={handleSubmit} className="mt-10 space-y-6">
-              <label className="block text-sm font-medium text-ink">
-                New password
-                <input
-                  type="password"
-                  minLength={8}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="mt-2 w-full rounded-lg border border-soft bg-slate-50 px-4 py-3 text-sm text-ink outline-none transition focus:border-ink"
-                  required
-                />
-              </label>
+              <PasswordInput
+                label="New password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                minLength={8}
+                autoComplete="new-password"
+                required
+              />
+              <PasswordInput
+                label="Confirm password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                minLength={8}
+                autoComplete="new-password"
+                required
+              />
               <button
                 type="submit"
                 disabled={isSubmitting}

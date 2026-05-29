@@ -6,9 +6,10 @@ import type { PublicPost } from '../lib/posts';
 
 interface PostEditorProps {
   post?: PublicPost;
+  suspended?: boolean;
 }
 
-export default function PostEditor({ post }: PostEditorProps) {
+export default function PostEditor({ post, suspended = false }: PostEditorProps) {
   const router = useRouter();
   const [form, setForm] = useState({
     title: post?.title || '',
@@ -23,6 +24,10 @@ export default function PostEditor({ post }: PostEditorProps) {
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSubmit = async (publishAction: 'draft' | 'publish') => {
+    if (suspended) {
+      setStatus('Your account is suspended. You cannot create or submit essays.');
+      return;
+    }
     setIsSaving(true);
     setStatus(publishAction === 'draft' ? 'Saving draft...' : 'Submitting...');
 
@@ -78,6 +83,12 @@ export default function PostEditor({ post }: PostEditorProps) {
       }}
       className="space-y-6 rounded-lg border border-soft bg-white p-8 shadow-panel"
     >
+      {suspended ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-900">
+          Your account is suspended. You can sign in, but you cannot create or submit essays until the editorial team
+          restores posting access.
+        </div>
+      ) : null}
       <div>
         <label className="mb-2 block text-sm font-medium text-ink">Title</label>
         <input
@@ -170,14 +181,14 @@ export default function PostEditor({ post }: PostEditorProps) {
           ) : null}
           <button
             type="submit"
-            disabled={isSaving}
+            disabled={isSaving || suspended}
             className="rounded-full border border-soft bg-white px-6 py-3 text-sm font-semibold text-ink transition hover:border-ink disabled:opacity-60"
           >
             Save draft
           </button>
           <button
             type="button"
-            disabled={isSaving}
+            disabled={isSaving || suspended}
             onClick={() => void handleSubmit('publish')}
             className="rounded-full bg-ink px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-900 disabled:opacity-60"
           >

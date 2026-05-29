@@ -10,6 +10,8 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../lib/auth';
 import { getProductionSiteUrl } from '../../../lib/env';
 
+export const dynamic = 'force-dynamic';
+
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const post = await getPostBySlug(params.slug);
   if (!post) return {};

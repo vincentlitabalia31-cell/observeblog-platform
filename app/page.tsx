@@ -5,6 +5,8 @@ import FeaturedPostCard from '../components/FeaturedPostCard';
 import NewsletterForm from '../components/NewsletterForm';
 import { getFeaturedPosts, getRecentPosts } from '../lib/posts';
 
+export const dynamic = 'force-dynamic';
+
 export default async function HomePage() {
   const posts = await getRecentPosts();
   const featuredPosts = await getFeaturedPosts();

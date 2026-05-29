@@ -4,22 +4,29 @@ import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import PasswordInput from '../../components/PasswordInput';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
   const [status, setStatus] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (form.password !== form.confirmPassword) {
+      setStatus('Passwords do not match.');
+      return;
+    }
+
     setIsSubmitting(true);
     setStatus('Creating account...');
 
     const response = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form)
+      body: JSON.stringify({ name: form.name, email: form.email, password: form.password })
     });
 
     const data = await response.json();
@@ -68,17 +75,22 @@ export default function RegisterPage() {
                 required
               />
             </label>
-            <label className="block text-sm font-medium text-ink">
-              Password
-              <input
-                type="password"
-                minLength={8}
-                value={form.password}
-                onChange={(event) => setForm({ ...form, password: event.target.value })}
-                className="mt-2 w-full rounded-lg border border-soft bg-slate-50 px-4 py-3 text-sm text-ink outline-none transition focus:border-ink"
-                required
-              />
-            </label>
+            <PasswordInput
+              label="Password"
+              value={form.password}
+              onChange={(event) => setForm({ ...form, password: event.target.value })}
+              minLength={8}
+              autoComplete="new-password"
+              required
+            />
+            <PasswordInput
+              label="Confirm password"
+              value={form.confirmPassword}
+              onChange={(event) => setForm({ ...form, confirmPassword: event.target.value })}
+              minLength={8}
+              autoComplete="new-password"
+              required
+            />
             <button
               type="submit"
               disabled={isSubmitting}

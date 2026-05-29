@@ -6,14 +6,16 @@ import PostEditor from '../../components/PostEditor';
 import AdminRequestButton from '../../components/AdminRequestButton';
 import { authOptions } from '../../lib/auth';
 import { getBookmarkedPostsForUser, getPostsForAuthor } from '../../lib/posts';
+import { isUserSuspended } from '../../lib/users';
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect('/login?callbackUrl=/dashboard');
 
-  const [posts, savedPosts] = await Promise.all([
+  const [posts, savedPosts, suspended] = await Promise.all([
     getPostsForAuthor(session.user.id),
-    getBookmarkedPostsForUser(session.user.id)
+    getBookmarkedPostsForUser(session.user.id),
+    session.user.role === 'admin' ? Promise.resolve(false) : isUserSuspended(session.user.id)
   ]);
   const stats = {
     draft: posts.filter((post) => post.status === 'draft').length,
@@ -52,7 +54,7 @@ export default async function DashboardPage() {
             </div>
           </div>
           {session.user.role !== 'admin' ? <AdminRequestButton /> : null}
-          <PostEditor />
+          <PostEditor suspended={suspended} />
 
           <section className="rounded-lg border border-soft bg-white p-8 shadow-panel">
             <div className="mb-6 flex items-end justify-between gap-4">

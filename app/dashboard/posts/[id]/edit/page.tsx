@@ -4,6 +4,7 @@ import Navigation from '../../../../../components/Navigation';
 import PostEditor from '../../../../../components/PostEditor';
 import { authOptions } from '../../../../../lib/auth';
 import { getEditablePost } from '../../../../../lib/posts';
+import { isUserSuspended } from '../../../../../lib/users';
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -14,7 +15,10 @@ export default async function EditPostPage({ params }: Params) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect('/login');
 
-  const post = await getEditablePost(id, session.user.id, session.user.role);
+  const [post, suspended] = await Promise.all([
+    getEditablePost(id, session.user.id, session.user.role),
+    session.user.role === 'admin' ? Promise.resolve(false) : isUserSuspended(session.user.id)
+  ]);
   if (!post) notFound();
 
   return (
@@ -31,7 +35,7 @@ export default async function EditPostPage({ params }: Params) {
             <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-amber-950">{post.adminNotes}</p>
           </div>
         ) : null}
-        <PostEditor post={post} />
+        <PostEditor post={post} suspended={suspended} />
       </section>
     </main>
   );

@@ -48,6 +48,7 @@ export default function NewsletterForm() {
           onChange={(event) => setForm({ ...form, frequency: event.target.value })}
           className="rounded-lg border border-soft bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink"
         >
+          <option value="immediate">Immediate</option>
           <option value="weekly">Weekly</option>
           <option value="daily">Daily</option>
         </select>

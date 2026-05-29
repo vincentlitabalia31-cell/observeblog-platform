@@ -4,6 +4,9 @@ import { authOptions } from '../../../lib/auth';
 import { connectToDatabase } from '../../../lib/mongodb';
 import { sanitizePlainText } from '../../../lib/security';
 import { logServerError } from '../../../lib/logging';
+import { sendPublishedEssayToSubscribers } from '../../../lib/newsletter';
+import { revalidateEditorialSurfaces } from '../../../lib/revalidate';
+import { isUserSuspended } from '../../../lib/users';
 import Post from '../../../models/Post';
 
 function slugify(value: string) {
@@ -30,6 +33,13 @@ export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+  }
+
+  if (session.user.role !== 'admin' && (await isUserSuspended(session.user.id))) {
+    return NextResponse.json(
+      { error: 'Your account is suspended. You cannot create or submit essays. Contact the editorial team.' },
+      { status: 403 }
+    );
   }
 
   try {
@@ -77,8 +87,16 @@ export async function POST(request: Request) {
       publishedAt: status === 'published' ? now : undefined,
       statusChangedAt: now
     });
+    const subscriberDelivery = status === 'published' ? await sendPublishedEssayToSubscribers(post) : undefined;
+    if (status === 'published') {
+      revalidateEditorialSurfaces(post.slug);
+    }
 
-    return NextResponse.json({ message: status === 'draft' ? 'Draft saved successfully.' : 'Post submitted successfully.', post });
+    return NextResponse.json({
+      message: status === 'draft' ? 'Draft saved successfully.' : 'Post submitted successfully.',
+      post,
+      subscriberDelivery
+    });
   } catch (error) {
     logServerError('Post create failed:', error);
     return NextResponse.json({ error: 'Unable to save post.' }, { status: 500 });

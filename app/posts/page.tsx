@@ -3,6 +3,8 @@ import EditorialCard from '../../components/EditorialCard';
 import NewsletterForm from '../../components/NewsletterForm';
 import { getAllPublicPosts } from '../../lib/posts';
 
+export const dynamic = 'force-dynamic';
+
 export default async function PostsPage() {
   const posts = await getAllPublicPosts();
 

@@ -2,6 +2,8 @@ import Navigation from '../../components/Navigation';
 import EditorialCard from '../../components/EditorialCard';
 import { searchPublicPosts } from '../../lib/posts';
 
+export const dynamic = 'force-dynamic';
+
 export default async function SearchPage({ searchParams }: { searchParams: { q?: string } }) {
   const query = searchParams.q?.trim() || '';
   const posts = await searchPublicPosts(query);

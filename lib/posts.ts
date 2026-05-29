@@ -39,6 +39,16 @@ export interface PublicProfile {
   role: 'contributor' | 'admin';
   bio: string;
   affiliation: string;
+  suspended: boolean;
+  createdAt: string;
+}
+
+export interface NewsletterSubscriberRow {
+  id: string;
+  email: string;
+  name?: string;
+  frequency: 'immediate' | 'daily' | 'weekly';
+  active: boolean;
   createdAt: string;
 }
 
@@ -57,6 +67,7 @@ export interface PublicComment {
 export interface AdminData {
   posts: PublicPost[];
   users: PublicProfile[];
+  subscribers: NewsletterSubscriberRow[];
   comments: PublicComment[];
   stats: {
     totalPosts: number;
@@ -130,14 +141,20 @@ function serializeProfile(user: any): PublicProfile {
     role: user.role === 'admin' ? 'admin' : 'contributor',
     bio: user.bio || '',
     affiliation: user.affiliation || '',
+    suspended: !!user.suspended,
     createdAt: user.createdAt.toISOString()
   };
 }
 
+/** Public visibility: published flag AND status (legacy posts included). */
+export const publicPostVisibilityFilter = {
+  $or: [{ status: 'published', published: true }, { status: { $exists: false }, published: true }]
+};
+
 export async function getRecentPosts(limit = 8): Promise<PublicPost[]> {
   if (!process.env.MONGODB_URI) return [];
   await connectToDatabase();
-  const posts = await Post.find({ $or: [{ status: 'published', published: true }, { status: { $exists: false }, published: true }] })
+  const posts = await Post.find(publicPostVisibilityFilter)
     .sort({ publishedAt: -1 })
     .limit(limit)
     .lean();
@@ -147,7 +164,7 @@ export async function getRecentPosts(limit = 8): Promise<PublicPost[]> {
 export async function getFeaturedPosts(limit = 3): Promise<PublicPost[]> {
   if (!process.env.MONGODB_URI) return [];
   await connectToDatabase();
-  const posts = await Post.find({ status: 'published', published: true, featured: true })
+  const posts = await Post.find({ ...publicPostVisibilityFilter, featured: true })
     .sort({ publishedAt: -1 })
     .limit(limit)
     .lean();
@@ -159,7 +176,7 @@ export async function getPostBySlug(slug: string): Promise<PublicPost | null> {
   await connectToDatabase();
   const post = await Post.findOne({
     slug,
-    $or: [{ status: 'published', published: true }, { status: { $exists: false }, published: true }]
+    ...publicPostVisibilityFilter
   }).lean();
   return post ? serializePost(post) : null;
 }
@@ -167,9 +184,7 @@ export async function getPostBySlug(slug: string): Promise<PublicPost | null> {
 export async function getAllPublicPosts(): Promise<PublicPost[]> {
   if (!process.env.MONGODB_URI) return [];
   await connectToDatabase();
-  const posts = await Post.find({ $or: [{ status: 'published', published: true }, { status: { $exists: false }, published: true }] })
-    .sort({ publishedAt: -1 })
-    .lean();
+  const posts = await Post.find(publicPostVisibilityFilter).sort({ publishedAt: -1 }).lean();
   return posts.map(serializePost);
 }
 
@@ -181,7 +196,7 @@ export async function searchPublicPosts(query: string): Promise<PublicPost[]> {
   const expression = new RegExp(cleanQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
   const posts = await Post.find({
     $and: [
-      { $or: [{ status: 'published', published: true }, { status: { $exists: false }, published: true }] },
+      publicPostVisibilityFilter,
       {
         $or: [
           { title: expression },
@@ -205,7 +220,7 @@ export async function getPostsByCategory(category: string): Promise<PublicPost[]
   await connectToDatabase();
   const posts = await Post.find({
     $and: [
-      { $or: [{ status: 'published', published: true }, { status: { $exists: false }, published: true }] },
+      publicPostVisibilityFilter,
       {
         $or: [
           { category: new RegExp(`^${category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
@@ -232,7 +247,7 @@ export async function getProfileWithPosts(id: string) {
   if (!user) return null;
   const posts = await Post.find({
     authorId: id,
-    $or: [{ status: 'published', published: true }, { status: { $exists: false }, published: true }]
+    ...publicPostVisibilityFilter
   })
     .sort({ publishedAt: -1 })
     .lean();
@@ -254,7 +269,7 @@ export async function getBookmarkedPostsForUser(userId: string): Promise<PublicP
   if (!ids.length) return [];
   const posts = await Post.find({
     _id: { $in: ids },
-    $or: [{ status: 'published', published: true }, { status: { $exists: false }, published: true }]
+    ...publicPostVisibilityFilter
   }).lean();
   return posts.map(serializePost);
 }
@@ -298,6 +313,7 @@ export async function getAdminData(): Promise<AdminData> {
     return {
       posts: [],
       users: [],
+      subscribers: [],
       comments: [],
       stats: {
         totalPosts: 0,
@@ -312,11 +328,12 @@ export async function getAdminData(): Promise<AdminData> {
     };
   }
   await connectToDatabase();
-  const [reviewPosts, recentPosts, users, comments, totalPosts, pendingPosts, publishedPosts, rejectedPosts, totalUsers, totalComments, pendingComments, subscribers] =
+  const [reviewPosts, recentPosts, users, newsletterRows, comments, totalPosts, pendingPosts, publishedPosts, rejectedPosts, totalUsers, totalComments, pendingComments, subscribers] =
     await Promise.all([
     Post.find({ status: { $in: ['pending', 'returned'] } }).sort({ updatedAt: -1 }).limit(60).lean(),
     Post.find({ status: { $nin: ['pending', 'returned'] } }).sort({ updatedAt: -1 }).limit(40).lean(),
     User.find({}).sort({ createdAt: -1 }).select('-password').limit(100).lean(),
+    NewsletterSubscriber.find({}).sort({ createdAt: -1 }).limit(100).lean(),
     Comment.find({}).sort({ updatedAt: -1 }).limit(100).lean(),
     Post.countDocuments({}),
     Post.countDocuments({ status: 'pending' }),
@@ -339,6 +356,14 @@ export async function getAdminData(): Promise<AdminData> {
   return {
     posts: posts.map(serializePost),
     users: profiles,
+    subscribers: newsletterRows.map((row: any) => ({
+      id: row._id.toString(),
+      email: row.email,
+      name: row.name || undefined,
+      frequency: ['immediate', 'daily', 'weekly'].includes(row.frequency) ? row.frequency : 'weekly',
+      active: !!row.active,
+      createdAt: row.createdAt.toISOString()
+    })),
     comments: comments.map(serializeComment),
     stats: {
       totalPosts,
