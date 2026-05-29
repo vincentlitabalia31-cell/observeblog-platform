@@ -1,16 +1,8 @@
 import type { MetadataRoute } from 'next';
-
-function getSiteUrl() {
-  const raw = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-  try {
-    return new URL(raw);
-  } catch {
-    return new URL('http://localhost:3000');
-  }
-}
+import { getProductionSiteUrl } from '../lib/env';
 
 export default function robots(): MetadataRoute.Robots {
-  const siteUrl = getSiteUrl();
+  const siteUrl = new URL(getProductionSiteUrl());
 
   return {
     rules: [

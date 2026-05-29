@@ -8,21 +8,13 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../lib/auth';
-
-function getSiteUrl() {
-  const raw = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-  try {
-    return new URL(raw);
-  } catch {
-    return new URL('http://localhost:3000');
-  }
-}
+import { getProductionSiteUrl } from '../../../lib/env';
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const post = await getPostBySlug(params.slug);
   if (!post) return {};
 
-  const siteUrl = getSiteUrl();
+  const siteUrl = new URL(getProductionSiteUrl());
   const url = new URL(`/posts/${encodeURIComponent(post.slug)}`, siteUrl);
 
   return {

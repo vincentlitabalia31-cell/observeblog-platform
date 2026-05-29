@@ -1,18 +1,10 @@
 import type { MetadataRoute } from 'next';
 import { connectToDatabase } from '../lib/mongodb';
 import Post from '../models/Post';
-
-function getSiteUrl() {
-  const raw = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-  try {
-    return new URL(raw);
-  } catch {
-    return new URL('http://localhost:3000');
-  }
-}
+import { getProductionSiteUrl } from '../lib/env';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const siteUrl = getSiteUrl();
+  const siteUrl = new URL(getProductionSiteUrl());
   const now = new Date();
 
   const staticRoutes: MetadataRoute.Sitemap = [

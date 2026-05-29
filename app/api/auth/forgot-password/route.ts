@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '../../../../lib/mongodb';
 import User from '../../../../models/User';
-import { getPublicSiteUrl, isEmailConfigured, sendPasswordResetEmail } from '../../../../lib/email';
+import { isEmailConfigured, sendPasswordResetEmail } from '../../../../lib/email';
+import { getProductionSiteUrl } from '../../../../lib/env';
 import { logServerError } from '../../../../lib/logging';
 import { createPasswordResetToken } from '../../../../lib/passwordReset';
 
@@ -33,7 +34,12 @@ export async function POST(request: Request) {
       user.passwordResetExpires = expiresAt;
       await user.save();
 
-      const resetUrl = `${getPublicSiteUrl(new URL(request.url).origin)}/reset-password?token=${encodeURIComponent(token)}`;
+      const siteOrigin = getProductionSiteUrl();
+      const resetUrl = `${siteOrigin}/reset-password?token=${encodeURIComponent(token)}`;
+      if (process.env.NODE_ENV !== 'production') {
+        console.info('[forgot-password] reset link origin:', siteOrigin);
+      }
+
       const emailResult = await sendPasswordResetEmail({ to: user.email, href: resetUrl });
 
       if (!emailResult.sent) {

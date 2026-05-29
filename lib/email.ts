@@ -1,13 +1,16 @@
 import nodemailer from 'nodemailer';
-import { getAuthBaseUrl } from './env';
+import { getProductionSiteUrl } from './env';
 import { logServerError } from './logging';
+
+const NOREPLY_EMAIL = 'observe.noreply@gmail.com';
 
 export type EmailSendResult =
   | { sent: true; provider: 'resend' | 'smtp' }
   | { sent: false; reason: 'EMAIL_NOT_CONFIGURED' | 'SEND_FAILED'; message?: string };
 
 function getEmailEnv(name: string) {
-  return process.env[name]?.trim();
+  const value = process.env[name]?.trim();
+  return value || undefined;
 }
 
 function logEmailError(message: string, error: unknown) {
@@ -31,15 +34,16 @@ export function isEmailConfigured() {
   return isSmtpConfigured() || isResendConfigured();
 }
 
-/** Matches Vercel production: EMAIL_FROM or Gmail observe.noreply@gmail.com via EMAIL_USER */
+/** All transactional mail sends from observe.noreply@gmail.com (Vercel Gmail SMTP). */
 function getFromAddress() {
+  const emailUser = getEmailEnv('EMAIL_USER') || NOREPLY_EMAIL;
   const explicitFrom = getEmailEnv('EMAIL_FROM') || getEmailEnv('NEWSLETTER_FROM');
-  if (explicitFrom) return explicitFrom;
 
-  const emailUser = getEmailEnv('EMAIL_USER');
-  if (emailUser) return `Observing India <${emailUser}>`;
+  if (explicitFrom && explicitFrom.includes('@')) {
+    return explicitFrom.includes('<') ? explicitFrom : `Observing India <${explicitFrom}>`;
+  }
 
-  return 'Observing India <observe.noreply@gmail.com>';
+  return `Observing India <${emailUser.includes('@') ? emailUser : NOREPLY_EMAIL}>`;
 }
 
 function normalizeGmailAppPassword(value?: string) {
@@ -167,19 +171,39 @@ export async function sendHtmlEmail(options: { to: string; subject: string; html
 }
 
 export function getPublicSiteUrl(fallbackOrigin?: string) {
-  const configured =
-    getAuthBaseUrl() ||
-    getEmailEnv('NEXT_PUBLIC_SITE_URL')?.replace(/\/$/, '') ||
-    fallbackOrigin?.replace(/\/$/, '');
+  return getProductionSiteUrl(fallbackOrigin);
+}
 
-  return configured || 'http://localhost:3000';
+function assertValidEmailHref(href: string, label: string) {
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    throw new Error(`Invalid ${label}: malformed URL`);
+  }
+
+  if (!/^https?:$/i.test(url.protocol)) {
+    throw new Error(`Invalid ${label}: must use http(s)`);
+  }
+
+  if (process.env.NODE_ENV === 'production' && /localhost|127\.0\.0\.1/i.test(url.origin)) {
+    throw new Error(`Invalid ${label}: localhost is not allowed in production emails`);
+  }
+
+  return url.toString();
 }
 
 export async function sendSubscriptionConfirmation(email: string) {
+  const siteUrl = getPublicSiteUrl();
+
   return sendMail({
     to: email,
     subject: 'Subscription Confirmed — Observing India',
-    text: 'Your Observing India subscription is confirmed. Thank you for reading with us.',
+    text: [
+      'Your Observing India subscription is confirmed. Thank you for reading with us.',
+      '',
+      `Visit us anytime: ${siteUrl}`
+    ].join('\n'),
     html: `
       <div style="font-family: Georgia, serif; background: #f7f5ef; padding: 32px; color: #1f1f1f">
         <div style="max-width: 620px; margin: 0 auto; background: #fffaf1; border: 1px solid #e6dfd3; padding: 28px">
@@ -189,7 +213,7 @@ export async function sendSubscriptionConfirmation(email: string) {
             Your subscription is confirmed. We will send thoughtful essays and publication updates to this address.
           </p>
           <p style="font-family: Arial, sans-serif; margin-top: 18px; line-height: 1.7; color: #6b6b6b">
-            Visit <a href="${escapeHtml(getPublicSiteUrl())}" style="color: #1f1f1f; font-weight: 700">Observing India</a> anytime.
+            Visit <a href="${siteUrl}" style="color: #1f1f1f; font-weight: 700">Observing India</a> anytime.
           </p>
         </div>
       </div>`
@@ -253,17 +277,20 @@ export async function sendPostStatusEmail({
 }
 
 export async function sendPasswordResetEmail({ to, href }: { to: string; href: string }) {
-  const safeHref = escapeHtml(href);
+  const resetUrl = assertValidEmailHref(href, 'password reset link');
+  const visibleUrl = escapeHtml(resetUrl);
 
   return sendMail({
     to,
     subject: 'Reset your Observing India password',
     text: [
       'We received a request to reset your Observing India password.',
-      'Use the link below within 60 minutes:',
-      href,
+      'Use this link within 60 minutes to choose a new password:',
+      '',
+      resetUrl,
+      '',
       'If you did not request this, you can ignore this email.'
-    ].join('\n\n'),
+    ].join('\n'),
     html: `
       <div style="font-family: Arial, sans-serif; background: #f7f5ef; padding: 32px; color: #1f1f1f">
         <div style="max-width: 620px; margin: 0 auto; background: #fffaf1; border: 1px solid #e6dfd3; padding: 28px">
@@ -272,10 +299,18 @@ export async function sendPasswordResetEmail({ to, href }: { to: string; href: s
           <p style="line-height: 1.7; color: #3a3a3a">
             We received a request to reset your password. This link expires in 60 minutes.
           </p>
-          <p style="margin-top: 22px">
-            <a href="${safeHref}" style="color: #1f1f1f; font-weight: 700">Reset password</a>
+          <p style="margin-top: 24px">
+            <a href="${resetUrl}" style="display: inline-block; background: #1f1f1f; color: #ffffff; text-decoration: none; font-weight: 700; padding: 12px 22px; border-radius: 999px">
+              Reset password
+            </a>
           </p>
-          <p style="line-height: 1.7; color: #6b6b6b">
+          <p style="margin-top: 22px; line-height: 1.7; color: #3a3a3a">
+            Or copy and paste this link into your browser:
+          </p>
+          <p style="margin-top: 8px; word-break: break-all; font-size: 14px; line-height: 1.6; color: #1f1f1f">
+            <a href="${resetUrl}" style="color: #1f1f1f; font-weight: 600">${visibleUrl}</a>
+          </p>
+          <p style="margin-top: 22px; line-height: 1.7; color: #6b6b6b">
             If you did not request this, you can ignore this email.
           </p>
         </div>
