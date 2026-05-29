@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { getFeaturedPosts, getRecentPosts } from './posts';
 import { getAuthSecret } from './env';
+import { getPublicSiteUrl, sendHtmlEmail } from './email';
 
 export function createUnsubscribeToken(email: string) {
   const secret = getAuthSecret();
@@ -10,7 +11,7 @@ export function createUnsubscribeToken(email: string) {
 export async function buildNewsletterHtml(frequency: 'daily' | 'weekly') {
   const [featured, recent] = await Promise.all([getFeaturedPosts(3), getRecentPosts(6)]);
   const essays = featured.length ? featured : recent;
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  const siteUrl = getPublicSiteUrl();
 
   const items = essays
     .map(
@@ -36,27 +37,14 @@ export async function buildNewsletterHtml(frequency: 'daily' | 'weekly') {
 }
 
 export async function sendNewsletterEmail(to: string, subject: string, html: string) {
-  if (!process.env.RESEND_API_KEY) {
-    return { queued: false, provider: 'none', message: 'RESEND_API_KEY is not configured.' };
+  const result = await sendHtmlEmail({ to, subject, html });
+  if (!result.sent) {
+    return {
+      queued: false,
+      provider: result.reason === 'EMAIL_NOT_CONFIGURED' ? 'none' : 'failed',
+      message: result.message || 'Unable to send newsletter email.'
+    };
   }
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from: process.env.NEWSLETTER_FROM || 'Observing India <onboarding@resend.dev>',
-      to,
-      subject,
-      html
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error('Unable to send newsletter email.');
-  }
-
-  return { queued: true, provider: 'resend' };
+  return { queued: true, provider: result.provider };
 }

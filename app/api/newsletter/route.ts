@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { connectToDatabase } from '../../../lib/mongodb';
 import { assertRateLimit, isValidEmail, normalizeEmail, sanitizePlainText } from '../../../lib/security';
 import { createUnsubscribeToken } from '../../../lib/newsletter';
-import { sendSubscriptionConfirmation } from '../../../lib/email';
+import { isEmailConfigured, sendSubscriptionConfirmation } from '../../../lib/email';
 import { logServerError } from '../../../lib/logging';
 import NewsletterSubscriber from '../../../models/NewsletterSubscriber';
 
@@ -34,12 +34,28 @@ export async function POST(request: Request) {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    void sendSubscriptionConfirmation(email).catch((error) => {
-      logServerError('Subscription confirmation email failed:', error);
-    });
+    if (!isEmailConfigured()) {
+      logServerError('Newsletter confirmation skipped: email provider not configured.', new Error('EMAIL_NOT_CONFIGURED'));
+      return NextResponse.json(
+        {
+          error:
+            'Subscription saved, but confirmation email could not be sent. Email delivery is not configured on the server.'
+        },
+        { status: 503 }
+      );
+    }
+
+    const emailResult = await sendSubscriptionConfirmation(email);
+    if (!emailResult.sent) {
+      logServerError('Subscription confirmation email failed:', new Error(emailResult.message || emailResult.reason));
+      return NextResponse.json(
+        { error: 'Subscription saved, but the confirmation email could not be delivered. Please try again shortly.' },
+        { status: 502 }
+      );
+    }
 
     return NextResponse.json({
-      message: 'Subscription saved.'
+      message: 'Subscription saved. Check your inbox for a confirmation email.'
     });
   } catch (error) {
     if (error instanceof Error && error.message === 'RATE_LIMITED') {

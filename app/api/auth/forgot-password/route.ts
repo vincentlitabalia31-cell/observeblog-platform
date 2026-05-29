@@ -1,22 +1,22 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '../../../../lib/mongodb';
 import User from '../../../../models/User';
-import { sendPasswordResetEmail } from '../../../../lib/email';
+import { getPublicSiteUrl, isEmailConfigured, sendPasswordResetEmail } from '../../../../lib/email';
 import { logServerError } from '../../../../lib/logging';
 import { createPasswordResetToken } from '../../../../lib/passwordReset';
 
 const RESET_REQUEST_MESSAGE = 'If an account exists with this email, a password reset link has been sent.';
 const RESET_ERROR_MESSAGE = 'Something went wrong. Please try again later.';
-
-function getResetBaseUrl(request: Request) {
-  const configuredUrl = process.env.NEXTAUTH_URL || process.env.APP_URL;
-  if (configuredUrl) return configuredUrl.replace(/\/$/, '');
-
-  return new URL(request.url).origin;
-}
+const EMAIL_NOT_CONFIGURED_MESSAGE =
+  'Password reset is temporarily unavailable. Please contact support or try again later.';
 
 export async function POST(request: Request) {
   try {
+    if (!isEmailConfigured()) {
+      logServerError('Forgot password blocked: email provider not configured.', new Error('EMAIL_NOT_CONFIGURED'));
+      return NextResponse.json({ error: EMAIL_NOT_CONFIGURED_MESSAGE }, { status: 503 });
+    }
+
     const body = await request.json();
     const email = typeof body.email === 'string' ? body.email.toLowerCase().trim() : '';
 
@@ -33,10 +33,13 @@ export async function POST(request: Request) {
       user.passwordResetExpires = expiresAt;
       await user.save();
 
-      const resetUrl = `${getResetBaseUrl(request)}/reset-password?token=${encodeURIComponent(token)}`;
-      void sendPasswordResetEmail({ to: user.email, href: resetUrl }).catch((error) => {
-        logServerError('Password reset email error:', error);
-      });
+      const resetUrl = `${getPublicSiteUrl(new URL(request.url).origin)}/reset-password?token=${encodeURIComponent(token)}`;
+      const emailResult = await sendPasswordResetEmail({ to: user.email, href: resetUrl });
+
+      if (!emailResult.sent) {
+        logServerError('Password reset email was not delivered.', new Error(emailResult.message || emailResult.reason));
+        return NextResponse.json({ error: RESET_ERROR_MESSAGE }, { status: 502 });
+      }
     }
 
     return NextResponse.json({ message: RESET_REQUEST_MESSAGE });

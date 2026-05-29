@@ -1,5 +1,10 @@
 import nodemailer from 'nodemailer';
+import { getAuthBaseUrl } from './env';
 import { logServerError } from './logging';
+
+export type EmailSendResult =
+  | { sent: true; provider: 'resend' | 'smtp' }
+  | { sent: false; reason: 'EMAIL_NOT_CONFIGURED' | 'SEND_FAILED'; message?: string };
 
 function getEmailEnv(name: string) {
   return process.env[name]?.trim();
@@ -16,6 +21,22 @@ function logEmailError(message: string, error: unknown) {
 
 export function isSmtpConfigured() {
   return Boolean(getEmailEnv('EMAIL_USER') && getEmailEnv('EMAIL_PASS'));
+}
+
+export function isResendConfigured() {
+  return Boolean(getEmailEnv('RESEND_API_KEY'));
+}
+
+export function isEmailConfigured() {
+  return isResendConfigured() || isSmtpConfigured();
+}
+
+function getFromAddress() {
+  return (
+    getEmailEnv('NEWSLETTER_FROM') ||
+    getEmailEnv('EMAIL_FROM') ||
+    'Observing India <onboarding@resend.dev>'
+  );
 }
 
 function createTransporter() {
@@ -55,30 +76,89 @@ function escapeHtml(value: string) {
     .replace(/'/g, '&#39;');
 }
 
-async function sendMail(options: { to: string; subject: string; text: string; html: string }) {
-  if (!isSmtpConfigured()) {
-    logEmailError('Email skipped: SMTP environment variables are not configured.', new Error('SMTP_NOT_CONFIGURED'));
-    return { sent: false, reason: 'SMTP_NOT_CONFIGURED' };
+async function sendViaResend(options: { to: string; subject: string; text: string; html: string }) {
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${getEmailEnv('RESEND_API_KEY')}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: getFromAddress(),
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+      text: options.text
+    })
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`Resend API error (${response.status}): ${body || response.statusText}`);
+  }
+
+  return { sent: true as const, provider: 'resend' as const };
+}
+
+async function sendViaSmtp(options: { to: string; subject: string; text: string; html: string }) {
+  const transporter = createTransporter();
+  await transporter.sendMail({
+    from: getEmailEnv('EMAIL_FROM') || getEmailEnv('EMAIL_USER'),
+    ...options
+  });
+  return { sent: true as const, provider: 'smtp' as const };
+}
+
+export async function sendMail(options: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+}): Promise<EmailSendResult> {
+  if (!isEmailConfigured()) {
+    const message = 'Email provider is not configured. Set RESEND_API_KEY or SMTP credentials.';
+    logEmailError('Email skipped: provider not configured.', new Error('EMAIL_NOT_CONFIGURED'));
+    return { sent: false, reason: 'EMAIL_NOT_CONFIGURED', message };
   }
 
   try {
-    const transporter = createTransporter();
-    await transporter.sendMail({
-      from: getEmailEnv('EMAIL_FROM') || getEmailEnv('EMAIL_USER'),
-      ...options
-    });
+    if (isResendConfigured()) {
+      return await sendViaResend(options);
+    }
+    return await sendViaSmtp(options);
   } catch (error) {
     logEmailError('Email send failed:', error);
-    throw error;
+    return {
+      sent: false,
+      reason: 'SEND_FAILED',
+      message: error instanceof Error ? error.message : 'Email send failed.'
+    };
   }
+}
 
-  return { sent: true };
+/** Used by admin newsletter digests and any HTML-only sends. */
+export async function sendHtmlEmail(options: { to: string; subject: string; html: string; text?: string }) {
+  return sendMail({
+    to: options.to,
+    subject: options.subject,
+    text: options.text || 'View this message in an HTML-capable email client.',
+    html: options.html
+  });
+}
+
+export function getPublicSiteUrl(fallbackOrigin?: string) {
+  const configured =
+    getAuthBaseUrl() ||
+    getEmailEnv('NEXT_PUBLIC_SITE_URL')?.replace(/\/$/, '') ||
+    fallbackOrigin?.replace(/\/$/, '');
+
+  return configured || 'http://localhost:3000';
 }
 
 export async function sendSubscriptionConfirmation(email: string) {
   return sendMail({
     to: email,
-    subject: 'Subscription Confirmed',
+    subject: 'Subscription Confirmed — Observing India',
     text: 'Your Observing India subscription is confirmed. Thank you for reading with us.',
     html: `
       <div style="font-family: Georgia, serif; background: #f7f5ef; padding: 32px; color: #1f1f1f">
@@ -87,6 +167,9 @@ export async function sendSubscriptionConfirmation(email: string) {
           <h1 style="font-size: 32px; margin: 8px 0 12px">Observing India</h1>
           <p style="font-family: Arial, sans-serif; line-height: 1.7; color: #3a3a3a">
             Your subscription is confirmed. We will send thoughtful essays and publication updates to this address.
+          </p>
+          <p style="font-family: Arial, sans-serif; margin-top: 18px; line-height: 1.7; color: #6b6b6b">
+            Visit <a href="${escapeHtml(getPublicSiteUrl())}" style="color: #1f1f1f; font-weight: 700">Observing India</a> anytime.
           </p>
         </div>
       </div>`

@@ -59,9 +59,20 @@ createdAt
 
 Admin routes are protected at `/admin` and `/api/admin/*` by the NextAuth session role.
 
-## Newsletter setup
+## Email setup (password reset + newsletter)
 
-Subscriptions work with only MongoDB configured. To send email, add:
+Password reset and subscription confirmation emails require a configured provider.
+
+**Recommended (Vercel + local): Resend**
+
+```bash
+RESEND_API_KEY=re_xxxxxxxx
+NEWSLETTER_FROM="Observing India <newsletter@yourdomain.com>"
+NEXTAUTH_URL=https://your-production-domain.com
+NEXT_PUBLIC_SITE_URL=https://your-production-domain.com
+```
+
+**Alternative: SMTP**
 
 ```bash
 EMAIL_HOST=smtp.example.com
@@ -69,12 +80,9 @@ EMAIL_PORT=587
 EMAIL_USER=your_smtp_user
 EMAIL_PASS=your_smtp_password
 EMAIL_FROM="Observing India <newsletter@yourdomain.com>"
-RESEND_API_KEY=your_resend_key
-NEWSLETTER_FROM="Observing India <newsletter@yourdomain.com>"
-NEXT_PUBLIC_SITE_URL=https://your-domain.com
 ```
 
-Subscription confirmation emails are sent immediately with Nodemailer. Admin digest sending can still use Resend through `/api/admin/newsletter`.
+Resend is preferred when set; SMTP is used as fallback. Without either, forgot-password and newsletter subscribe return a clear server error instead of failing silently.
 
 ## Deployment
 

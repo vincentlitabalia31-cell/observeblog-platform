@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../../lib/auth';
 import { connectToDatabase } from '../../../../lib/mongodb';
+import { getPublicSiteUrl } from '../../../../lib/email';
 import { buildNewsletterHtml, sendNewsletterEmail } from '../../../../lib/newsletter';
 import { logServerError } from '../../../../lib/logging';
 import NewsletterSubscriber from '../../../../models/NewsletterSubscriber';
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
       const result = await sendNewsletterEmail(
         subscriber.email,
         `Observing India ${safeFrequency} digest`,
-        `${html}<p style="font-size:12px;color:#6b6b6b">Unsubscribe: ${process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/newsletter?email=${encodeURIComponent(subscriber.email)}&token=${subscriber.unsubscribeToken}</p>`
+        `${html}<p style="font-size:12px;color:#6b6b6b">Unsubscribe: ${getPublicSiteUrl()}/api/newsletter?email=${encodeURIComponent(subscriber.email)}&token=${subscriber.unsubscribeToken}</p>`
       ).catch((error) => {
         logServerError('Newsletter email failed:', error);
         return { queued: false, provider: 'resend', message: 'Unable to send newsletter email.' };
