@@ -28,33 +28,49 @@ export function isResendConfigured() {
 }
 
 export function isEmailConfigured() {
-  return isResendConfigured() || isSmtpConfigured();
+  return isSmtpConfigured() || isResendConfigured();
 }
 
+/** Matches Vercel production: EMAIL_FROM or Gmail observe.noreply@gmail.com via EMAIL_USER */
 function getFromAddress() {
-  return (
-    getEmailEnv('NEWSLETTER_FROM') ||
-    getEmailEnv('EMAIL_FROM') ||
-    'Observing India <onboarding@resend.dev>'
-  );
+  const explicitFrom = getEmailEnv('EMAIL_FROM') || getEmailEnv('NEWSLETTER_FROM');
+  if (explicitFrom) return explicitFrom;
+
+  const emailUser = getEmailEnv('EMAIL_USER');
+  if (emailUser) return `Observing India <${emailUser}>`;
+
+  return 'Observing India <observe.noreply@gmail.com>';
+}
+
+function normalizeGmailAppPassword(value?: string) {
+  return value?.replace(/\s+/g, '') || '';
 }
 
 function createTransporter() {
   const emailUser = getEmailEnv('EMAIL_USER');
-  const emailPass = getEmailEnv('EMAIL_PASS');
+  const emailPass = normalizeGmailAppPassword(getEmailEnv('EMAIL_PASS'));
   const emailHost = getEmailEnv('EMAIL_HOST');
-  const emailService = getEmailEnv('EMAIL_SERVICE') || 'gmail';
+  const emailService = (getEmailEnv('EMAIL_SERVICE') || 'gmail').toLowerCase();
+  const useGmail = emailService === 'gmail' || emailUser?.endsWith('@gmail.com');
 
-  if (emailHost) {
-    const port = Number(getEmailEnv('EMAIL_PORT') || 587);
+  const host = emailHost || (useGmail ? 'smtp.gmail.com' : undefined);
+  if (host) {
+    const port = Number(getEmailEnv('EMAIL_PORT') || (useGmail ? 587 : 587));
+    const secure = port === 465;
     return nodemailer.createTransport({
-      host: emailHost,
+      host,
       port,
-      secure: port === 465,
+      secure,
       auth: {
         user: emailUser,
         pass: emailPass
-      }
+      },
+      ...(useGmail && !secure
+        ? {
+            requireTLS: true,
+            tls: { minVersion: 'TLSv1.2' as const }
+          }
+        : {})
     });
   }
 
@@ -103,7 +119,7 @@ async function sendViaResend(options: { to: string; subject: string; text: strin
 async function sendViaSmtp(options: { to: string; subject: string; text: string; html: string }) {
   const transporter = createTransporter();
   await transporter.sendMail({
-    from: getEmailEnv('EMAIL_FROM') || getEmailEnv('EMAIL_USER'),
+    from: getFromAddress(),
     ...options
   });
   return { sent: true as const, provider: 'smtp' as const };
@@ -116,16 +132,20 @@ export async function sendMail(options: {
   html: string;
 }): Promise<EmailSendResult> {
   if (!isEmailConfigured()) {
-    const message = 'Email provider is not configured. Set RESEND_API_KEY or SMTP credentials.';
+    const message =
+      'Email provider is not configured. Set EMAIL_USER and EMAIL_PASS (Gmail) on Vercel, or RESEND_API_KEY.';
     logEmailError('Email skipped: provider not configured.', new Error('EMAIL_NOT_CONFIGURED'));
     return { sent: false, reason: 'EMAIL_NOT_CONFIGURED', message };
   }
 
   try {
+    if (isSmtpConfigured()) {
+      return await sendViaSmtp(options);
+    }
     if (isResendConfigured()) {
       return await sendViaResend(options);
     }
-    return await sendViaSmtp(options);
+    return { sent: false, reason: 'EMAIL_NOT_CONFIGURED', message: 'No email provider available.' };
   } catch (error) {
     logEmailError('Email send failed:', error);
     return {

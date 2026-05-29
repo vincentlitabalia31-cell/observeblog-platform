@@ -61,28 +61,21 @@ Admin routes are protected at `/admin` and `/api/admin/*` by the NextAuth sessio
 
 ## Email setup (password reset + newsletter)
 
-Password reset and subscription confirmation emails require a configured provider.
-
-**Recommended (Vercel + local): Resend**
+Production on Vercel uses **Gmail SMTP** (no custom domain required). Set the same variable names in Vercel → Settings → Environment Variables:
 
 ```bash
-RESEND_API_KEY=re_xxxxxxxx
-NEWSLETTER_FROM="Observing India <newsletter@yourdomain.com>"
-NEXTAUTH_URL=https://your-production-domain.com
-NEXT_PUBLIC_SITE_URL=https://your-production-domain.com
-```
-
-**Alternative: SMTP**
-
-```bash
-EMAIL_HOST=smtp.example.com
+EMAIL_SERVICE=gmail
+EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
-EMAIL_USER=your_smtp_user
-EMAIL_PASS=your_smtp_password
-EMAIL_FROM="Observing India <newsletter@yourdomain.com>"
+EMAIL_USER=observe.noreply@gmail.com
+EMAIL_PASS=your-16-char-gmail-app-password
+EMAIL_FROM="Observing India <observe.noreply@gmail.com>"
+NEXTAUTH_URL=https://observeblog-platform.vercel.app
+NEXT_PUBLIC_SITE_URL=https://observeblog-platform.vercel.app
+ADMIN_EMAIL=vincentlitabalia31@gmail.com
 ```
 
-Resend is preferred when set; SMTP is used as fallback. Without either, forgot-password and newsletter subscribe return a clear server error instead of failing silently.
+Use a [Gmail App Password](https://myaccount.google.com/apppasswords) for `EMAIL_PASS` (not your regular Gmail password). SMTP is used first when `EMAIL_USER` and `EMAIL_PASS` are set.
 
 ## Deployment
 

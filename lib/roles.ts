@@ -5,7 +5,14 @@ import User from '../models/User';
 
 export type AppRole = 'contributor' | 'admin';
 export type AdminRequestStatus = 'pending' | 'approved' | 'rejected';
-export const SINGLE_ADMIN_EMAIL = 'vincentlitabalia31@gmail.com';
+const DEFAULT_ADMIN_EMAIL = 'vincentlitabalia31@gmail.com';
+
+/** Uses Vercel `ADMIN_EMAIL` when set, otherwise the default admin inbox. */
+export function getAdminEmail() {
+  return (process.env.ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL).toLowerCase().trim();
+}
+
+export const SINGLE_ADMIN_EMAIL = DEFAULT_ADMIN_EMAIL;
 
 export interface AdminRequest {
   id: string;
@@ -16,7 +23,7 @@ export interface AdminRequest {
 }
 
 export function isConfiguredAdminEmail(email?: string | null) {
-  return Boolean(email && email.toLowerCase().trim() === SINGLE_ADMIN_EMAIL);
+  return Boolean(email && email.toLowerCase().trim() === getAdminEmail());
 }
 
 export async function persistEffectiveRole(userId: string, email: string) {
